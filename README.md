@@ -130,6 +130,27 @@ Health check:
 http://127.0.0.1:47321/health
 ```
 
+The public npm package source lives in:
+
+```text
+packages/tokenguard-bridge
+```
+
+Before publishing a new bridge version:
+
+```bash
+npm run bridge:package
+npm login
+npm run bridge:publish
+```
+
+After publishing, users can install the bridge with:
+
+```bash
+npm install -g tokenguard-bridge
+tokenguard-bridge start
+```
+
 ## macOS Bridge Fallback
 
 If NPM is not available, the no-cost unsigned macOS fallback package is available from:

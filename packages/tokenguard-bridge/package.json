@@ -1,0 +1,39 @@
+{
+  "name": "tokenguard-bridge",
+  "version": "0.1.0",
+  "description": "Local Codex bridge for TokenGuard.",
+  "type": "module",
+  "bin": {
+    "tokenguard-bridge": "./bin/tokenguard-bridge.mjs"
+  },
+  "files": [
+    "bin",
+    "server.mjs",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node ./bin/tokenguard-bridge.mjs start",
+    "status": "node ./bin/tokenguard-bridge.mjs status"
+  },
+  "keywords": [
+    "codex",
+    "tokenguard",
+    "ai",
+    "developer-tools",
+    "bridge"
+  ],
+  "author": "Shashank Pabitwar",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shashankpabitwar123/tokenguard-prod.git",
+    "directory": "packages/tokenguard-bridge"
+  },
+  "homepage": "https://tokenguard-prod.vercel.app",
+  "bugs": {
+    "url": "https://github.com/Shashankpabitwar123/tokenguard-prod/issues"
+  }
+}
