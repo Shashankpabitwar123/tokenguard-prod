@@ -29,6 +29,7 @@ import {
 
 const BRIDGE_URL = "http://127.0.0.1:47321";
 const BRIDGE_DOWNLOAD_URL = "/downloads/token-guard-bridge-macos.zip";
+const BRIDGE_INSTALL_COMMAND = "npm install -g tokenguard-bridge && tokenguard-bridge start";
 
 const codexRules = [
   "Use git diff and repo metadata before sending full files",
@@ -250,7 +251,7 @@ export default function TokenGuardCodexApp() {
     } catch {
       setBridge({
         status: "offline",
-        detail: "Run: npm run bridge",
+        detail: "Install and start the bridge using the command below.",
       });
     }
   }
@@ -540,7 +541,6 @@ export default function TokenGuardCodexApp() {
                 account={account}
                 runs={runs}
                 lastRun={lastRun}
-                onDownloadBridge={markBridgeDownload}
                 optimized={optimized || optimizedPrompt}
               />
           </div>
@@ -772,19 +772,16 @@ function ChatPane(props) {
                   TokenGuard stays blank until it can mirror your real Codex account. Install the bridge once, then connect with official Codex login.
                 </p>
                 <div className="space-y-3">
-                  <StepRow number="1" title="Download TokenGuard Bridge" text="Install the local helper once. It runs in the background after setup." />
-                  <StepRow number="2" title="Check bridge" text={props.bridge?.detail || "Waiting for local bridge"} />
-                  <StepRow number="3" title="Login with ChatGPT/Codex" text="Click connect after the bridge is online." />
+                  <StepRow number="1" title="Open Terminal" text="On Mac, press Command + Space, type Terminal, then press Enter. On Windows, open PowerShell." />
+                  <StepRow number="2" title="Paste this command" text="This installs the TokenGuard bridge and starts it." code={BRIDGE_INSTALL_COMMAND} />
+                  <StepRow number="3" title="Wait for detection" text={props.bridge?.detail || "TokenGuard checks automatically every few seconds."} />
+                  <StepRow number="4" title="Connect Codex" text="When the bridge is online, click Connect Codex. Official ChatGPT/Codex login will open." />
                 </div>
-                <div className="mt-4 flex gap-2">
-                  <a
-                    href={BRIDGE_DOWNLOAD_URL}
-                    onClick={props.onDownloadBridge}
-                    className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download Bridge
-                  </a>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button onClick={() => navigator.clipboard?.writeText(BRIDGE_INSTALL_COMMAND)} className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
+                    <Copy className="h-4 w-4" />
+                    Copy install command
+                  </button>
                   <button onClick={props.onRefreshBridge} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900">
                     Check bridge
                   </button>
@@ -795,6 +792,9 @@ function ChatPane(props) {
                   >
                     Connect Codex
                   </button>
+                </div>
+                <div className="mt-4 text-xs leading-5 text-slate-500">
+                  Advanced Mac fallback: <a href={BRIDGE_DOWNLOAD_URL} onClick={props.onDownloadBridge} className="font-medium text-slate-700 underline dark:text-slate-300">download unsigned zip</a>. Use this only if NPM is not available.
                 </div>
               </div>
             )}
@@ -851,7 +851,7 @@ function ChatPane(props) {
   );
 }
 
-function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, onDownloadBridge, optimized }) {
+function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, optimized }) {
   const codexConnected = Boolean(account?.account);
   const totalAvoided = runs.reduce((sum, run) => sum + Number(run.metadata?.avoidedTokens ?? Math.max(0, run.originalTokens - run.optimizedTokens)), 0);
   const averageSaved = runs.length
@@ -873,17 +873,14 @@ function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, onDownloadB
           <RuleRow>Codex account: {codexConnected ? "connected" : "not connected"}</RuleRow>
         </PanelSection>
         <PanelSection title="Setup">
-          <a
-            href={BRIDGE_DOWNLOAD_URL}
-            onClick={onDownloadBridge}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
-          >
-            <Download className="h-4 w-4" />
-            Download Bridge
-          </a>
-          <div className="mt-3 text-xs leading-5 text-slate-500">
-            After installation, TokenGuard will detect the bridge and show the Codex login button.
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-5 dark:border-slate-800 dark:bg-slate-900">
+            {BRIDGE_INSTALL_COMMAND}
           </div>
+          <button onClick={() => navigator.clipboard?.writeText(BRIDGE_INSTALL_COMMAND)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
+            <Copy className="h-4 w-4" />
+            Copy command
+          </button>
+          <div className="mt-3 text-xs leading-5 text-slate-500">Paste this into Terminal or PowerShell. TokenGuard will detect the bridge automatically after it starts.</div>
         </PanelSection>
       </aside>
     );
@@ -1059,21 +1056,24 @@ function SettingsModal({
                     </div>
                   </div>
                 </SettingsCard>
-                <SettingsCard title="How to connect Codex" description="Do this once on the same laptop where Codex is installed.">
+                <SettingsCard title="How to connect Codex" description="Do this once on the same computer where you use Codex.">
                   <div className="space-y-3 text-sm">
-                    <StepRow number="1" title="Download and install the bridge" text="Open the installer once. After that it starts in the background." />
-                    <StepRow number="2" title="Open TokenGuard" text="Log in to your TokenGuard account in the website." />
-                    <StepRow number="3" title="Connect your Codex account" text="Click the button below. Codex opens ChatGPT login locally; TokenGuard never receives your password." />
+                    <StepRow number="1" title="Open Terminal or PowerShell" text="Mac: press Command + Space, type Terminal, press Enter. Windows: open PowerShell." />
+                    <StepRow number="2" title="Paste and run this command" text="It installs the small local bridge and starts it." code={BRIDGE_INSTALL_COMMAND} />
+                    <StepRow number="3" title="Return to TokenGuard" text="The website checks automatically. You can also click Check again." />
+                    <StepRow number="4" title="Connect your Codex account" text="Click the button below. Codex opens official ChatGPT login locally; TokenGuard never receives your password." />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <a
-                      href={BRIDGE_DOWNLOAD_URL}
-                      onClick={onDownloadBridge}
+                    <button
+                      onClick={() => navigator.clipboard?.writeText(BRIDGE_INSTALL_COMMAND)}
                       className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900"
                     >
-                      <Download className="h-4 w-4" />
-                      Download Bridge
-                    </a>
+                      <Copy className="h-4 w-4" />
+                      Copy command
+                    </button>
+                    <button onClick={onRefreshBridge} className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900">
+                      Check again
+                    </button>
                     <button
                       onClick={onStartLogin}
                       disabled={bridge.status !== "connected"}
@@ -1094,10 +1094,16 @@ function SettingsModal({
                     <RuleRow>No Codex account detected yet</RuleRow>
                   )}
                 </SettingsCard>
-                <SettingsCard title="If macOS blocks the installer" description="Unsigned apps need one extra approval because we are not using a paid Apple Developer certificate.">
-                  <StepRow number="1" title="Open the downloaded zip" text="Find token-guard-bridge-macos.zip in Downloads and unzip it." />
-                  <StepRow number="2" title="Right-click install.command" text="Choose Open from the context menu instead of double-clicking." />
-                  <StepRow number="3" title="Approve the prompt" text="Click Open. After install, return here and TokenGuard will detect the bridge." />
+                <SettingsCard title="Advanced fallback" description="Use this only if the NPM command does not work on your computer.">
+                  <a href={BRIDGE_DOWNLOAD_URL} onClick={onDownloadBridge} className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900">
+                    <Download className="h-4 w-4" />
+                    Download unsigned Mac zip
+                  </a>
+                  <div className="mt-3 space-y-3">
+                    <StepRow number="1" title="Unzip the download" text="Find token-guard-bridge-macos.zip in Downloads and open it." />
+                    <StepRow number="2" title="Right-click install.command" text="Choose Open from the context menu. Do not double-click." />
+                    <StepRow number="3" title="Approve the prompt" text="Click Open. After install, return here and TokenGuard will detect the bridge." />
+                  </div>
                 </SettingsCard>
               </>
             )}

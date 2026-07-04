@@ -18,8 +18,8 @@ Use Codex normally, but send less unnecessary context.
 
 ```text
 TokenGuard login
-→ Download TokenGuard Bridge
-→ Approve the local helper once
+→ Copy one install command
+→ Paste it into Terminal or PowerShell once
 → Connect Codex with official ChatGPT/Codex login
 → TokenGuard mirrors real Codex history
 → User runs optimized Codex tasks
@@ -32,7 +32,7 @@ Before Codex is connected, the app intentionally stays blank. It does not show f
 - Codex-only primary workflow.
 - Email-based TokenGuard account creation.
 - Local bridge detection at `127.0.0.1:47321`.
-- Downloadable macOS bridge MVP.
+- NPM-first bridge setup with copyable beginner-friendly instructions.
 - Official Codex/ChatGPT login initiated through the local bridge.
 - Real Codex thread listing and reading through `codex app-server`.
 - Optimized prompt generation before sending tasks to Codex.
@@ -91,6 +91,25 @@ Open:
 http://localhost:3000
 ```
 
+## Bridge Setup For Users
+
+Primary no-cost setup:
+
+```bash
+npm install -g tokenguard-bridge && tokenguard-bridge start
+```
+
+Beginner version:
+
+1. Open Terminal on Mac, or PowerShell on Windows.
+2. Paste the command above.
+3. Press Enter.
+4. Keep the bridge running.
+5. Return to TokenGuard.
+6. Click `Connect Codex`.
+
+The website checks for the bridge automatically.
+
 ## Bridge Development
 
 For developer testing:
@@ -111,15 +130,15 @@ Health check:
 http://127.0.0.1:47321/health
 ```
 
-## macOS Bridge MVP
+## macOS Bridge Fallback
 
-The no-cost bridge package is available from:
+If NPM is not available, the no-cost unsigned macOS fallback package is available from:
 
 ```text
 public/downloads/token-guard-bridge-macos.zip
 ```
 
-Because the project is not using paid Apple signing/notarization, users may need to right-click `install.command` and choose `Open`.
+Because the project is not using paid Apple signing/notarization, users may need to right-click `install.command` and choose `Open`. This is not the recommended primary path.
 
 The polished paid-production path would be a signed and notarized macOS app/pkg.
 

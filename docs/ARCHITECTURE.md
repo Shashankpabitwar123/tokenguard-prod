@@ -48,3 +48,13 @@ Codex login happens locally through official Codex/ChatGPT authentication. The h
 ## Empty-State Rule
 
 Before Codex is connected, TokenGuard should not show fake chats, fake projects, or fake savings. It should show only setup and connection state.
+
+## Setup Strategy
+
+The primary no-cost bridge install path is NPM:
+
+```bash
+npm install -g tokenguard-bridge && tokenguard-bridge start
+```
+
+This avoids macOS unsigned-installer warnings and works better for developer users across macOS, Windows, and Linux. The unsigned macOS zip is kept only as an advanced fallback.
