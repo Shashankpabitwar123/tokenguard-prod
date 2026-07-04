@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Circle,
   Copy,
+  Download,
   FolderOpen,
   Gauge,
   KeyRound,
@@ -27,8 +28,7 @@ import {
 } from "lucide-react";
 
 const BRIDGE_URL = "http://127.0.0.1:47321";
-const samplePrompt =
-  "Fix the login redirect bug. Inspect the smallest relevant files first, make a focused change, and run the most relevant tests.";
+const BRIDGE_DOWNLOAD_URL = "/downloads/token-guard-bridge-macos.zip";
 
 const codexRules = [
   "Use git diff and repo metadata before sending full files",
@@ -46,6 +46,9 @@ function formatNumber(value: number) {
 }
 
 function estimateTokens(prompt: string, mode: string) {
+  if (!prompt.trim()) {
+    return { original: 0, optimized: 0, avoided: 0, saved: 0 };
+  }
   const base = Math.max(11200, prompt.trim().length * 42);
   const multiplier = { fast: 0.52, balanced: 0.64, deep: 0.78 }[mode] ?? 0.64;
   const optimized = Math.round(base * multiplier);
@@ -150,7 +153,7 @@ export default function TokenGuardCodexApp() {
   const [lastRun, setLastRun] = useState<any>(null);
   const [selectedThread, setSelectedThread] = useState<any>(null);
   const [messages, setMessages] = useState<Array<{ role: string; text: string }>>([]);
-  const [prompt, setPrompt] = useState(samplePrompt);
+  const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState("idle");
   const [optimized, setOptimized] = useState("");
 
@@ -742,19 +745,22 @@ function ChatPane(props) {
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800">
               <Bot className="h-5 w-5" />
             </div>
-            <h2 className="text-2xl font-semibold tracking-tight">What should Codex work on?</h2>
-            <p className="mt-3 max-w-lg text-sm leading-6 text-slate-500">
-              TokenGuard optimizes the task first, then sends it to your local Codex session.
-            </p>
             {needsSetup && (
-              <div className="mt-6 w-full max-w-xl rounded-lg border border-slate-200 bg-slate-50 p-4 text-left dark:border-slate-800 dark:bg-slate-900">
-                <div className="mb-3 text-sm font-semibold">Connect Codex first</div>
+              <div className="w-full max-w-xl rounded-lg border border-slate-200 bg-slate-50 p-5 text-left dark:border-slate-800 dark:bg-slate-900">
+                <h2 className="text-2xl font-semibold tracking-tight">Connect Codex to start</h2>
+                <p className="mt-3 text-sm leading-6 text-slate-500">
+                  TokenGuard stays blank until it can mirror your real Codex account. Install the bridge once, then connect with official Codex login.
+                </p>
                 <div className="space-y-3">
-                  <StepRow number="1" title="Start bridge" text="Run this command locally and keep it open." code="npm run bridge" />
+                  <StepRow number="1" title="Download TokenGuard Bridge" text="Install the local helper once. It runs in the background after setup." />
                   <StepRow number="2" title="Check bridge" text={props.bridge?.detail || "Waiting for local bridge"} />
                   <StepRow number="3" title="Login with ChatGPT/Codex" text="Click connect after the bridge is online." />
                 </div>
                 <div className="mt-4 flex gap-2">
+                  <a href={BRIDGE_DOWNLOAD_URL} className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
+                    <Download className="h-4 w-4" />
+                    Download Bridge
+                  </a>
                   <button onClick={props.onRefreshBridge} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900">
                     Check bridge
                   </button>
@@ -768,13 +774,21 @@ function ChatPane(props) {
                 </div>
               </div>
             )}
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
-              {["Fix a bug", "Review a diff", "Explain this repo"].map((item) => (
-                <button key={item} onClick={() => props.setPrompt(item === "Fix a bug" ? samplePrompt : item)} className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
-                  {item}
-                </button>
-              ))}
-            </div>
+            {!needsSetup && (
+              <>
+                <h2 className="text-2xl font-semibold tracking-tight">What should Codex work on?</h2>
+                <p className="mt-3 max-w-lg text-sm leading-6 text-slate-500">
+                  TokenGuard optimizes the task first, then sends it to your local Codex session.
+                </p>
+                <div className="mt-6 flex flex-wrap justify-center gap-2">
+                  {["Fix a bug", "Review a diff", "Explain this repo"].map((item) => (
+                    <button key={item} onClick={() => props.setPrompt(item)} className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="mx-auto max-w-3xl space-y-5">
@@ -784,7 +798,7 @@ function ChatPane(props) {
         )}
       </div>
 
-      <div className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+      {!needsSetup && <div className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
         <div className="mx-auto max-w-3xl rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <textarea
             value={props.prompt}
@@ -808,7 +822,7 @@ function ChatPane(props) {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
     </section>
   );
 }
@@ -820,6 +834,32 @@ function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, optimized }
     ? Math.round(runs.reduce((sum, run) => sum + Number(run.savedPercent || 0), 0) / runs.length)
     : 0;
   const persistedRun = lastRun || runs[0];
+  if (!codexConnected || bridge.status !== "connected") {
+    return (
+      <aside className="hidden w-[340px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 xl:block">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold">Codex setup</h2>
+            <p className="text-xs text-slate-500">Savings appear after real Codex runs</p>
+          </div>
+          <Laptop className="h-5 w-5 text-slate-500" />
+        </div>
+        <PanelSection title="Connection status">
+          <RuleRow>Bridge: {bridge.status}</RuleRow>
+          <RuleRow>Codex account: {codexConnected ? "connected" : "not connected"}</RuleRow>
+        </PanelSection>
+        <PanelSection title="Setup">
+          <a href={BRIDGE_DOWNLOAD_URL} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
+            <Download className="h-4 w-4" />
+            Download Bridge
+          </a>
+          <div className="mt-3 text-xs leading-5 text-slate-500">
+            After installation, TokenGuard will detect the bridge and show the Codex login button.
+          </div>
+        </PanelSection>
+      </aside>
+    );
+  }
   return (
     <aside className="hidden w-[340px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 xl:block">
       <div className="mb-4 flex items-center justify-between">
@@ -992,18 +1032,24 @@ function SettingsModal({
                 </SettingsCard>
                 <SettingsCard title="How to connect Codex" description="Do this once on the same laptop where Codex is installed.">
                   <div className="space-y-3 text-sm">
-                    <StepRow number="1" title="Start the local bridge" text="Run this in the project folder and keep it running." code="npm run bridge" />
+                    <StepRow number="1" title="Download and install the bridge" text="Open the installer once. After that it starts in the background." />
                     <StepRow number="2" title="Open TokenGuard" text="Log in to your TokenGuard account in the website." />
                     <StepRow number="3" title="Connect your Codex account" text="Click the button below. Codex opens ChatGPT login locally; TokenGuard never receives your password." />
                   </div>
-                  <button
-                    onClick={onStartLogin}
-                    disabled={bridge.status !== "connected"}
-                    className="mt-4 inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
-                  >
-                    <KeyRound className="h-4 w-4" />
-                    {codexConnected ? "Reconnect Codex account" : "Connect Codex account"}
-                  </button>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <a href={BRIDGE_DOWNLOAD_URL} className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900">
+                      <Download className="h-4 w-4" />
+                      Download Bridge
+                    </a>
+                    <button
+                      onClick={onStartLogin}
+                      disabled={bridge.status !== "connected"}
+                      className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      {codexConnected ? "Reconnect Codex account" : "Connect Codex account"}
+                    </button>
+                  </div>
                 </SettingsCard>
                 <SettingsCard title="Current Codex account" description="This comes from the local bridge, not TokenGuard's database.">
                   {codexConnected ? (
