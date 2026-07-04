@@ -156,6 +156,7 @@ export default function TokenGuardCodexApp() {
   const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState("idle");
   const [optimized, setOptimized] = useState("");
+  const [bridgeInstallStarted, setBridgeInstallStarted] = useState(false);
 
   const stats = useMemo(() => estimateTokens(prompt, mode), [prompt, mode]);
   const optimizedPrompt = useMemo(() => buildOptimizedPrompt(prompt, mode), [prompt, mode]);
@@ -190,6 +191,14 @@ export default function TokenGuardCodexApp() {
     loadCodexAccount();
     loadThreads();
   }, [bridgeReady]);
+
+  useEffect(() => {
+    if (!isAuthed || bridgeReady) return;
+    const timer = window.setInterval(() => {
+      refreshBridge();
+    }, bridgeInstallStarted ? 3000 : 8000);
+    return () => window.clearInterval(timer);
+  }, [isAuthed, bridgeReady, bridgeInstallStarted]);
 
   async function login() {
     const nextEmail = draftEmail.trim();
@@ -252,6 +261,14 @@ export default function TokenGuardCodexApp() {
       window.open(payload.login.authUrl, "_blank", "noopener,noreferrer");
     }
     window.setTimeout(loadCodexAccount, 2500);
+  }
+
+  function markBridgeDownload() {
+    setBridgeInstallStarted(true);
+    setBridge({
+      status: "waiting",
+      detail: "Install the bridge, then TokenGuard will detect it automatically.",
+    });
   }
 
   async function loadCodexAccount() {
@@ -512,6 +529,7 @@ export default function TokenGuardCodexApp() {
                 account={account}
                 onRefreshBridge={refreshBridge}
                 onStartLogin={startCodexLogin}
+                onDownloadBridge={markBridgeDownload}
                 optimizeOnly={optimizeOnly}
                 runWithCodex={runWithCodex}
               />
@@ -522,6 +540,7 @@ export default function TokenGuardCodexApp() {
                 account={account}
                 runs={runs}
                 lastRun={lastRun}
+                onDownloadBridge={markBridgeDownload}
                 optimized={optimized || optimizedPrompt}
               />
           </div>
@@ -539,6 +558,7 @@ export default function TokenGuardCodexApp() {
           account={account}
           onRefreshBridge={refreshBridge}
           onStartLogin={startCodexLogin}
+          onDownloadBridge={markBridgeDownload}
           onClose={() => setSettingsOpen(false)}
           onSignOut={() => {
             window.localStorage.removeItem("tokenguard_email");
@@ -757,7 +777,11 @@ function ChatPane(props) {
                   <StepRow number="3" title="Login with ChatGPT/Codex" text="Click connect after the bridge is online." />
                 </div>
                 <div className="mt-4 flex gap-2">
-                  <a href={BRIDGE_DOWNLOAD_URL} className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
+                  <a
+                    href={BRIDGE_DOWNLOAD_URL}
+                    onClick={props.onDownloadBridge}
+                    className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+                  >
                     <Download className="h-4 w-4" />
                     Download Bridge
                   </a>
@@ -827,7 +851,7 @@ function ChatPane(props) {
   );
 }
 
-function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, optimized }) {
+function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, onDownloadBridge, optimized }) {
   const codexConnected = Boolean(account?.account);
   const totalAvoided = runs.reduce((sum, run) => sum + Number(run.metadata?.avoidedTokens ?? Math.max(0, run.originalTokens - run.optimizedTokens)), 0);
   const averageSaved = runs.length
@@ -849,7 +873,11 @@ function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, optimized }
           <RuleRow>Codex account: {codexConnected ? "connected" : "not connected"}</RuleRow>
         </PanelSection>
         <PanelSection title="Setup">
-          <a href={BRIDGE_DOWNLOAD_URL} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
+          <a
+            href={BRIDGE_DOWNLOAD_URL}
+            onClick={onDownloadBridge}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+          >
             <Download className="h-4 w-4" />
             Download Bridge
           </a>
@@ -931,6 +959,7 @@ function SettingsModal({
   account,
   onRefreshBridge,
   onStartLogin,
+  onDownloadBridge,
   onClose,
   onSignOut,
 }) {
@@ -1037,7 +1066,11 @@ function SettingsModal({
                     <StepRow number="3" title="Connect your Codex account" text="Click the button below. Codex opens ChatGPT login locally; TokenGuard never receives your password." />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <a href={BRIDGE_DOWNLOAD_URL} className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900">
+                    <a
+                      href={BRIDGE_DOWNLOAD_URL}
+                      onClick={onDownloadBridge}
+                      className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900"
+                    >
                       <Download className="h-4 w-4" />
                       Download Bridge
                     </a>
@@ -1060,6 +1093,11 @@ function SettingsModal({
                   ) : (
                     <RuleRow>No Codex account detected yet</RuleRow>
                   )}
+                </SettingsCard>
+                <SettingsCard title="If macOS blocks the installer" description="Unsigned apps need one extra approval because we are not using a paid Apple Developer certificate.">
+                  <StepRow number="1" title="Open the downloaded zip" text="Find token-guard-bridge-macos.zip in Downloads and unzip it." />
+                  <StepRow number="2" title="Right-click install.command" text="Choose Open from the context menu instead of double-clicking." />
+                  <StepRow number="3" title="Approve the prompt" text="Click Open. After install, return here and TokenGuard will detect the bridge." />
                 </SettingsCard>
               </>
             )}
