@@ -4,7 +4,7 @@
   "description": "Local Codex bridge for TokenGuard.",
   "type": "module",
   "bin": {
-    "tokenguard-bridge": "./bin/tokenguard-bridge.mjs"
+    "tokenguard-bridge": "bin/tokenguard-bridge.mjs"
   },
   "files": [
     "bin",
