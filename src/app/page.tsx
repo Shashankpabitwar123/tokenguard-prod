@@ -1,5 +1,5 @@
-import TokenGuardApp from "@/components-token-guard-app";
+import TokenGuardCodexApp from "@/components/TokenGuardCodexApp";
 
 export default function Home() {
-  return <TokenGuardApp />;
+  return <TokenGuardCodexApp />;
 }

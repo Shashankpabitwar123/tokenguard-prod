@@ -80,3 +80,58 @@ export const optimizationRuns = pgTable("optimization_runs", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const bridgeDevices = pgTable(
+  "bridge_devices",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    deviceName: text("device_name").notNull(),
+    status: text("status").notNull().default("connected"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userDeviceIdx: uniqueIndex("bridge_devices_user_device_idx").on(table.userId, table.deviceName),
+  }),
+);
+
+export const mirroredProjects = pgTable(
+  "mirrored_projects",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    cwd: text("cwd"),
+    provider: text("provider").notNull().default("codex"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userProjectIdx: uniqueIndex("mirrored_projects_user_name_idx").on(table.userId, table.name),
+  }),
+);
+
+export const pinnedThreads = pgTable(
+  "pinned_threads",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull().default("codex"),
+    threadId: text("thread_id").notNull(),
+    title: text("title").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    userThreadIdx: uniqueIndex("pinned_threads_user_provider_thread_idx").on(
+      table.userId,
+      table.provider,
+      table.threadId,
+    ),
+  }),
+);

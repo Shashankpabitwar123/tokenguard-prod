@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TokenGuard
 
-## Getting Started
+TokenGuard is a Codex-first token-saving mirror. Users work in a familiar chat workspace, TokenGuard prepares a compact prompt/context packet, then the local Codex bridge sends that optimized task into the user's own Codex session.
 
-First, run the development server:
+## Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+TokenGuard Web App
+  - account, settings, pins, projects, savings stats
+  - deployed on Vercel
+
+TokenGuard Codex Bridge
+  - runs on the user's laptop
+  - wraps `codex app-server`
+  - mirrors Codex threads without storing full conversations
+
+Neon Postgres
+  - stores TokenGuard metadata only
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+TokenGuard does not ask for a ChatGPT password or store Codex conversations. ChatGPT/Codex auth stays on the user's machine through Codex.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Local Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+Open:
 
-To learn more about Next.js, take a look at the following resources:
+```text
+http://localhost:3000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Local Codex Bridge
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Codex must be installed and logged in on the user's machine.
 
-## Deploy on Vercel
+```bash
+npm run bridge
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The bridge listens on:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+http://127.0.0.1:47321
+```
+
+The web app detects this bridge, reads Codex account status, lists local Codex threads, reads selected threads, and sends optimized turns to Codex.
+
+## Database
+
+Migrations live in `drizzle/`.
+
+Current metadata tables include:
+
+- users
+- provider_connections
+- provider_rulebooks
+- user_settings
+- optimization_runs
+- bridge_devices
+- mirrored_projects
+- pinned_threads
+
+## Commands
+
+```bash
+npm run lint
+npm run build
+npm run bridge
+```
