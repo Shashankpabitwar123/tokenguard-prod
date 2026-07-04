@@ -43,7 +43,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const parsed = runSchema.safeParse(await request.json());
+  const body = await request.json();
+  const parsed = runSchema.safeParse({
+    ...body,
+    email: body.email ?? body.userEmail,
+    prompt: body.prompt ?? body.originalPrompt,
+  });
 
   if (!parsed.success) {
     return NextResponse.json({ error: "email and prompt are required" }, { status: 400 });
