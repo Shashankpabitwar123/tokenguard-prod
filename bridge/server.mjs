@@ -37,6 +37,14 @@ function sendJson(res, status, body, origin) {
   res.end(payload);
 }
 
+function sendHtml(res, status, html, origin) {
+  res.writeHead(status, {
+    "Access-Control-Allow-Origin": corsOrigin(origin),
+    "Content-Type": "text/html; charset=utf-8",
+  });
+  res.end(html);
+}
+
 async function readJson(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -210,6 +218,44 @@ async function handle(req, res) {
   }
 
   try {
+    if (req.method === "GET" && url.pathname === "/") {
+      return sendHtml(
+        res,
+        200,
+        `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TokenGuard Codex Bridge</title>
+    <style>
+      body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f7f7f8; color: #0f172a; }
+      main { max-width: 720px; margin: 0 auto; padding: 48px 20px; }
+      .card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 24px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); }
+      h1 { margin: 0; font-size: 28px; }
+      p { color: #475569; line-height: 1.6; }
+      code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; padding: 2px 6px; }
+      a { color: #047857; font-weight: 600; }
+      .status { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; color: #047857; font-weight: 600; }
+      .dot { width: 9px; height: 9px; border-radius: 99px; background: #10b981; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>TokenGuard Codex Bridge is running</h1>
+        <div class="status"><span class="dot"></span> Local bridge online at 127.0.0.1:47321</div>
+        <p>This is not the main app. Keep this bridge process running, then open TokenGuard and connect your Codex account.</p>
+        <p>Main app: <a href="https://tokenguard-prod.vercel.app">https://tokenguard-prod.vercel.app</a></p>
+        <p>Health endpoint: <code>/health</code></p>
+      </div>
+    </main>
+  </body>
+</html>`,
+        origin,
+      );
+    }
+
     if (req.method === "GET" && url.pathname === "/health") {
       const version = await getCodexVersion();
       let account = null;

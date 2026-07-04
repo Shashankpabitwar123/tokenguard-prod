@@ -146,6 +146,8 @@ export default function TokenGuardCodexApp() {
   const [threads, setThreads] = useState<any[]>([]);
   const [pins, setPins] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [runs, setRuns] = useState<any[]>([]);
+  const [lastRun, setLastRun] = useState<any>(null);
   const [selectedThread, setSelectedThread] = useState<any>(null);
   const [messages, setMessages] = useState<Array<{ role: string; text: string }>>([]);
   const [prompt, setPrompt] = useState(samplePrompt);
@@ -205,6 +207,12 @@ export default function TokenGuardCodexApp() {
     ]);
     setPins(pinsPayload.pins ?? []);
     setProjects(projectsPayload.projects ?? []);
+    await loadRuns(userEmail);
+  }
+
+  async function loadRuns(userEmail = email) {
+    const payload = await jsonFetch(`/api/runs?email=${encodeURIComponent(userEmail)}`);
+    setRuns(payload.runs ?? []);
   }
 
   async function refreshBridge() {
@@ -340,7 +348,7 @@ export default function TokenGuardCodexApp() {
       },
     ]);
 
-    await jsonFetch("/api/runs", {
+    const runPayload = await jsonFetch("/api/runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -351,6 +359,8 @@ export default function TokenGuardCodexApp() {
         mode,
       }),
     });
+    setLastRun(runPayload.run);
+    await loadRuns(email);
 
     if (!bridgeReady || !codexReady) {
       setStatus("blocked");
@@ -485,26 +495,32 @@ export default function TokenGuardCodexApp() {
           />
 
           <div className="flex min-h-0 flex-1">
-            <ChatPane
-              messages={messages}
-              selectedThread={selectedThread}
-              prompt={prompt}
-              setPrompt={setPrompt}
-              status={status}
-              stats={stats}
-              optimized={optimized}
-              bridgeReady={bridgeReady}
-              codexReady={codexReady}
-              optimizeOnly={optimizeOnly}
-              runWithCodex={runWithCodex}
-            />
-            <SavingsPanel
-              stats={stats}
-              mode={mode}
-              bridge={bridge}
-              account={account}
-              optimized={optimized || optimizedPrompt}
-            />
+              <ChatPane
+                messages={messages}
+                selectedThread={selectedThread}
+                prompt={prompt}
+                setPrompt={setPrompt}
+                status={status}
+                stats={stats}
+                optimized={optimized}
+                bridgeReady={bridgeReady}
+                codexReady={codexReady}
+                bridge={bridge}
+                account={account}
+                onRefreshBridge={refreshBridge}
+                onStartLogin={startCodexLogin}
+                optimizeOnly={optimizeOnly}
+                runWithCodex={runWithCodex}
+              />
+              <SavingsPanel
+                stats={stats}
+                mode={mode}
+                bridge={bridge}
+                account={account}
+                runs={runs}
+                lastRun={lastRun}
+                optimized={optimized || optimizedPrompt}
+              />
           </div>
         </main>
       </div>
@@ -517,6 +533,9 @@ export default function TokenGuardCodexApp() {
           theme={theme}
           setTheme={setTheme}
           bridge={bridge}
+          account={account}
+          onRefreshBridge={refreshBridge}
+          onStartLogin={startCodexLogin}
           onClose={() => setSettingsOpen(false)}
           onSignOut={() => {
             window.localStorage.removeItem("tokenguard_email");
@@ -709,6 +728,7 @@ function TopBar({ bridge, account, mode, setMode, onMenu, onRefreshBridge, onSta
 
 function ChatPane(props) {
   const hasMessages = props.messages.length > 0;
+  const needsSetup = !props.bridgeReady || !props.codexReady;
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-white dark:bg-slate-950">
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2 text-xs text-slate-500 dark:border-slate-800">
@@ -726,6 +746,28 @@ function ChatPane(props) {
             <p className="mt-3 max-w-lg text-sm leading-6 text-slate-500">
               TokenGuard optimizes the task first, then sends it to your local Codex session.
             </p>
+            {needsSetup && (
+              <div className="mt-6 w-full max-w-xl rounded-lg border border-slate-200 bg-slate-50 p-4 text-left dark:border-slate-800 dark:bg-slate-900">
+                <div className="mb-3 text-sm font-semibold">Connect Codex first</div>
+                <div className="space-y-3">
+                  <StepRow number="1" title="Start bridge" text="Run this command locally and keep it open." code="npm run bridge" />
+                  <StepRow number="2" title="Check bridge" text={props.bridge?.detail || "Waiting for local bridge"} />
+                  <StepRow number="3" title="Login with ChatGPT/Codex" text="Click connect after the bridge is online." />
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button onClick={props.onRefreshBridge} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900">
+                    Check bridge
+                  </button>
+                  <button
+                    onClick={props.onStartLogin}
+                    disabled={!props.bridgeReady}
+                    className="rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950"
+                  >
+                    Connect Codex
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               {["Fix a bug", "Review a diff", "Explain this repo"].map((item) => (
                 <button key={item} onClick={() => props.setPrompt(item === "Fix a bug" ? samplePrompt : item)} className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
@@ -771,8 +813,13 @@ function ChatPane(props) {
   );
 }
 
-function SavingsPanel({ stats, mode, bridge, account, optimized }) {
+function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, optimized }) {
   const codexConnected = Boolean(account?.account);
+  const totalAvoided = runs.reduce((sum, run) => sum + Number(run.metadata?.avoidedTokens ?? Math.max(0, run.originalTokens - run.optimizedTokens)), 0);
+  const averageSaved = runs.length
+    ? Math.round(runs.reduce((sum, run) => sum + Number(run.savedPercent || 0), 0) / runs.length)
+    : 0;
+  const persistedRun = lastRun || runs[0];
   return (
     <aside className="hidden w-[340px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 xl:block">
       <div className="mb-4 flex items-center justify-between">
@@ -795,6 +842,26 @@ function SavingsPanel({ stats, mode, bridge, account, optimized }) {
           <Stat label="Mode" value={mode} />
         </div>
       </div>
+      <PanelSection title="Backend savings">
+        <div className="grid grid-cols-2 gap-3">
+          <Stat label="Saved runs" value={formatNumber(runs.length)} />
+          <Stat label="Avg saved" value={`${averageSaved}%`} />
+          <Stat label="Tokens avoided" value={formatNumber(totalAvoided)} />
+          <Stat label="Latest" value={persistedRun ? `${persistedRun.savedPercent}%` : "None"} />
+        </div>
+      </PanelSection>
+      <PanelSection title="Recent runs">
+        {runs.length === 0 ? (
+          <div className="text-sm text-slate-500">No saved optimization runs yet.</div>
+        ) : (
+          runs.slice(0, 5).map((run) => (
+            <div key={run.id} className="rounded-md border border-slate-100 px-2.5 py-2 text-sm dark:border-slate-800">
+              <div className="truncate font-medium">{run.title}</div>
+              <div className="mt-1 text-xs text-slate-500">{run.savedPercent}% saved · {formatNumber(run.originalTokens - run.optimizedTokens)} tokens avoided</div>
+            </div>
+          ))
+        )}
+      </PanelSection>
       <PanelSection title="Connection">
         <RuleRow>{bridge.status === "connected" ? "Local bridge online" : bridge.detail}</RuleRow>
         <RuleRow>{codexConnected ? "Codex account connected locally" : "Codex login required"}</RuleRow>
@@ -814,7 +881,28 @@ function SavingsPanel({ stats, mode, bridge, account, optimized }) {
   );
 }
 
-function SettingsModal({ email, mode, setMode, theme, setTheme, bridge, onClose, onSignOut }) {
+function SettingsModal({
+  email,
+  mode,
+  setMode,
+  theme,
+  setTheme,
+  bridge,
+  account,
+  onRefreshBridge,
+  onStartLogin,
+  onClose,
+  onSignOut,
+}) {
+  const [section, setSection] = useState("general");
+  const codexConnected = Boolean(account?.account);
+  const sections = [
+    { id: "general", label: "General" },
+    { id: "bridge", label: "Codex bridge" },
+    { id: "rulebook", label: "Rulebook" },
+    { id: "privacy", label: "Privacy" },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/25 p-4">
       <div className="flex h-[min(680px,92vh)] w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-xl dark:bg-slate-950">
@@ -823,47 +911,127 @@ function SettingsModal({ email, mode, setMode, theme, setTheme, bridge, onClose,
             <div className="text-lg font-semibold">Settings</div>
             <div className="mt-1 text-xs text-slate-500">Codex mirror preferences</div>
           </div>
-          {["General", "Codex bridge", "Rulebook", "Privacy"].map((item) => (
-            <div key={item} className="rounded-md px-2.5 py-2 text-sm first:bg-white first:font-medium dark:first:bg-slate-800">{item}</div>
+          {sections.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setSection(item.id)}
+              className={cx(
+                "w-full rounded-md px-2.5 py-2 text-left text-sm",
+                section === item.id
+                  ? "bg-white font-medium shadow-sm dark:bg-slate-800"
+                  : "text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800",
+              )}
+            >
+              {item.label}
+            </button>
           ))}
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
             <div>
-              <div className="font-semibold">General</div>
+              <div className="font-semibold">{sections.find((item) => item.id === section)?.label}</div>
               <div className="text-xs text-slate-500">{email}</div>
             </div>
             <button onClick={onClose} className="rounded-md p-2 hover:bg-slate-100 dark:hover:bg-slate-900"><X className="h-5 w-5" /></button>
           </div>
           <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
-            <SettingsCard title="Appearance" description="Dark mode is stored on this browser.">
-              <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-800 dark:bg-slate-900">
-                {["light", "dark"].map((item) => (
-                  <button key={item} onClick={() => setTheme(item)} className={cx("rounded px-3 py-1.5 text-sm font-medium capitalize", theme === item ? "bg-white shadow-sm dark:bg-slate-800" : "text-slate-500")}>{item}</button>
-                ))}
-              </div>
-            </SettingsCard>
-            <SettingsCard title="Optimization mode" description="Default mode for new Codex prompts.">
-              <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-800 dark:bg-slate-900">
-                {["fast", "balanced", "deep"].map((item) => (
-                  <button key={item} onClick={() => setMode(item)} className={cx("rounded px-3 py-1.5 text-sm font-medium capitalize", mode === item ? "bg-white shadow-sm dark:bg-slate-800" : "text-slate-500")}>{item}</button>
-                ))}
-              </div>
-            </SettingsCard>
-            <SettingsCard title="Codex bridge" description="The bridge keeps ChatGPT/Codex auth on your machine.">
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-                <div className="font-mono">npm run bridge</div>
-                <div className="mt-2 text-xs text-slate-500">{bridge.detail}</div>
-              </div>
-            </SettingsCard>
-            <SettingsCard title="Privacy" description="TokenGuard stores metadata, not full Codex conversations.">
-              <RuleRow>Pins store thread IDs and titles only</RuleRow>
-              <RuleRow>Projects store local path labels only</RuleRow>
-              <RuleRow>Optimization runs store prompts and savings stats</RuleRow>
-            </SettingsCard>
-            <button onClick={onSignOut} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
-              Sign out
-            </button>
+            {section === "general" && (
+              <>
+                <SettingsCard title="Appearance" description="Theme is stored in this browser and applies instantly.">
+                  <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-800 dark:bg-slate-900">
+                    {["light", "dark"].map((item) => (
+                      <button
+                        key={item}
+                        onClick={() => setTheme(item)}
+                        className={cx(
+                          "rounded px-3 py-1.5 text-sm font-medium capitalize",
+                          theme === item ? "bg-white shadow-sm dark:bg-slate-800" : "text-slate-500",
+                        )}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </SettingsCard>
+                <SettingsCard title="Optimization mode" description="Default mode for new Codex prompts.">
+                  <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-800 dark:bg-slate-900">
+                    {["fast", "balanced", "deep"].map((item) => (
+                      <button
+                        key={item}
+                        onClick={() => setMode(item)}
+                        className={cx(
+                          "rounded px-3 py-1.5 text-sm font-medium capitalize",
+                          mode === item ? "bg-white shadow-sm dark:bg-slate-800" : "text-slate-500",
+                        )}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </SettingsCard>
+                <button onClick={onSignOut} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900">
+                  Sign out
+                </button>
+              </>
+            )}
+
+            {section === "bridge" && (
+              <>
+                <SettingsCard title="Codex bridge status" description="The bridge keeps ChatGPT/Codex auth on your machine.">
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-medium capitalize">Bridge: {bridge.status}</div>
+                        <div className="mt-1 text-xs text-slate-500">{bridge.detail}</div>
+                      </div>
+                      <button onClick={onRefreshBridge} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900">
+                        Check again
+                      </button>
+                    </div>
+                  </div>
+                </SettingsCard>
+                <SettingsCard title="How to connect Codex" description="Do this once on the same laptop where Codex is installed.">
+                  <div className="space-y-3 text-sm">
+                    <StepRow number="1" title="Start the local bridge" text="Run this in the project folder and keep it running." code="npm run bridge" />
+                    <StepRow number="2" title="Open TokenGuard" text="Log in to your TokenGuard account in the website." />
+                    <StepRow number="3" title="Connect your Codex account" text="Click the button below. Codex opens ChatGPT login locally; TokenGuard never receives your password." />
+                  </div>
+                  <button
+                    onClick={onStartLogin}
+                    disabled={bridge.status !== "connected"}
+                    className="mt-4 inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
+                  >
+                    <KeyRound className="h-4 w-4" />
+                    {codexConnected ? "Reconnect Codex account" : "Connect Codex account"}
+                  </button>
+                </SettingsCard>
+                <SettingsCard title="Current Codex account" description="This comes from the local bridge, not TokenGuard's database.">
+                  {codexConnected ? (
+                    <>
+                      <RuleRow>{account.account.email || "Codex account detected"}</RuleRow>
+                      <RuleRow>Plan: {account.account.planType || "unknown"}</RuleRow>
+                    </>
+                  ) : (
+                    <RuleRow>No Codex account detected yet</RuleRow>
+                  )}
+                </SettingsCard>
+              </>
+            )}
+
+            {section === "rulebook" && (
+              <SettingsCard title="Codex optimization rulebook" description="These rules are applied before TokenGuard sends a task to Codex.">
+                {codexRules.map((rule) => <RuleRow key={rule}>{rule}</RuleRow>)}
+              </SettingsCard>
+            )}
+
+            {section === "privacy" && (
+              <SettingsCard title="Privacy" description="TokenGuard stores metadata, not full Codex conversations.">
+                <RuleRow>Pins store thread IDs and titles only</RuleRow>
+                <RuleRow>Projects store local path labels only</RuleRow>
+                <RuleRow>Optimization runs store prompts and savings stats</RuleRow>
+                <RuleRow>ChatGPT/Codex login stays inside your local Codex session</RuleRow>
+              </SettingsCard>
+            )}
           </div>
         </div>
       </div>
@@ -942,5 +1110,24 @@ function SettingsCard({ title, description, children }) {
       <p className="mt-1 text-sm text-slate-500">{description}</p>
       <div className="mt-3">{children}</div>
     </section>
+  );
+}
+
+function StepRow({ number, title, text, code }) {
+  return (
+    <div className="grid grid-cols-[28px_1fr] gap-3">
+      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white dark:bg-white dark:text-slate-950">
+        {number}
+      </div>
+      <div>
+        <div className="font-medium">{title}</div>
+        <div className="mt-1 text-sm text-slate-500">{text}</div>
+        {code && (
+          <div className="mt-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 font-mono text-xs dark:border-slate-800 dark:bg-slate-950">
+            {code}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
