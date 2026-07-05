@@ -29,7 +29,7 @@ import {
 
 const BRIDGE_URL = "http://127.0.0.1:47321";
 const BRIDGE_DOWNLOAD_URL = "/downloads/token-guard-bridge-macos.zip";
-const BRIDGE_INSTALL_COMMAND = "npm install -g tokenguard-bridge && tokenguard-bridge start";
+const BRIDGE_INSTALL_COMMAND = "npx -y tokenguard-bridge@latest start";
 
 const codexRules = [
   "Use git diff and repo metadata before sending full files",

@@ -2,7 +2,7 @@
 
 Local Codex bridge for TokenGuard.
 
-## Install
+## Start Without Global Install
 
 Before installing:
 
@@ -12,13 +12,7 @@ Before installing:
 - Sign in to Codex with your ChatGPT/Codex account.
 
 ```bash
-npm install -g tokenguard-bridge
-```
-
-## Start
-
-```bash
-tokenguard-bridge start
+npx -y tokenguard-bridge@latest start
 ```
 
 Keep that terminal window open while using TokenGuard.
@@ -28,6 +22,15 @@ Then open:
 ```text
 https://tokenguard-prod.vercel.app
 ```
+
+## Optional Global Install
+
+```bash
+npm install -g tokenguard-bridge@latest
+tokenguard-bridge start
+```
+
+If global install gives a permission error on macOS, use the `npx` command above instead.
 
 ## Status
 
@@ -48,7 +51,7 @@ On macOS, the bridge automatically looks for Codex at:
 /Applications/Codex.app/Contents/Resources/codex
 ```
 
-If you already installed an older bridge version, update with:
+If you already installed an older bridge version globally, update with:
 
 ```bash
 npm install -g tokenguard-bridge@latest

@@ -103,7 +103,7 @@ Requirements:
 Primary no-cost setup:
 
 ```bash
-npm install -g tokenguard-bridge && tokenguard-bridge start
+npx -y tokenguard-bridge@latest start
 ```
 
 Mac beginner version:
@@ -171,17 +171,17 @@ npm login
 npm run bridge:publish
 ```
 
-After publishing, users can install the bridge with:
+After publishing, users can start the bridge with:
 
 ```bash
-npm install -g tokenguard-bridge
-tokenguard-bridge start
+npx -y tokenguard-bridge@latest start
 ```
 
-If users already installed an older bridge version, update with:
+If users prefer a global install and their system allows it:
 
 ```bash
 npm install -g tokenguard-bridge@latest
+tokenguard-bridge start
 ```
 
 ## macOS Bridge Fallback
