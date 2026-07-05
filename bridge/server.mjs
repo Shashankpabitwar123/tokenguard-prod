@@ -31,6 +31,7 @@ function sendJson(res, status, body, origin) {
     "Access-Control-Allow-Origin": corsOrigin(origin),
     "Access-Control-Allow-Headers": "content-type",
     "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+    "Access-Control-Allow-Private-Network": "true",
     "Content-Type": "application/json",
     "Content-Length": Buffer.byteLength(payload),
   });
@@ -40,6 +41,7 @@ function sendJson(res, status, body, origin) {
 function sendHtml(res, status, html, origin) {
   res.writeHead(status, {
     "Access-Control-Allow-Origin": corsOrigin(origin),
+    "Access-Control-Allow-Private-Network": "true",
     "Content-Type": "text/html; charset=utf-8",
   });
   res.end(html);
@@ -212,6 +214,7 @@ async function handle(req, res) {
       "Access-Control-Allow-Origin": corsOrigin(origin),
       "Access-Control-Allow-Headers": "content-type",
       "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+      "Access-Control-Allow-Private-Network": "true",
     });
     res.end();
     return;
@@ -349,6 +352,7 @@ async function handle(req, res) {
     if (req.method === "GET" && url.pathname === "/events") {
       res.writeHead(200, {
         "Access-Control-Allow-Origin": corsOrigin(origin),
+        "Access-Control-Allow-Private-Network": "true",
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
         "Content-Type": "text/event-stream",
