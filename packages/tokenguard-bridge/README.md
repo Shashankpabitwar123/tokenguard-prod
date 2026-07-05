@@ -4,6 +4,13 @@ Local Codex bridge for TokenGuard.
 
 ## Install
 
+Before installing:
+
+- Install Node.js 20 or newer.
+- Mac: install the Codex desktop app in `/Applications/Codex.app`.
+- Windows: install Codex CLI and confirm `codex --version` works in PowerShell.
+- Sign in to Codex with your ChatGPT/Codex account.
+
 ```bash
 npm install -g tokenguard-bridge
 ```
@@ -31,8 +38,21 @@ tokenguard-bridge status
 ## Requirements
 
 - Node.js 20+
-- Codex CLI installed
+- Mac: Codex desktop app installed, or Codex CLI available as `codex`
+- Windows: Codex CLI available as `codex`
 - Codex signed in with your ChatGPT/Codex account
+
+On macOS, the bridge automatically looks for Codex at:
+
+```text
+/Applications/Codex.app/Contents/Resources/codex
+```
+
+If you already installed an older bridge version, update with:
+
+```bash
+npm install -g tokenguard-bridge@latest
+```
 
 ## Privacy
 

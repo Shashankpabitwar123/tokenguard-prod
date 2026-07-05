@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { spawn, execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
@@ -18,6 +19,13 @@ const pending = new Map();
 const pendingApprovals = new Map();
 const sseClients = new Set();
 const recentEvents = [];
+const codexCandidates = [
+  process.env.TOKENGUARD_CODEX_BIN,
+  "/Applications/Codex.app/Contents/Resources/codex",
+  "/Applications/Codex.app/Contents/MacOS/Codex",
+  "codex",
+].filter(Boolean);
+let resolvedCodexCommand = null;
 
 function corsOrigin(origin) {
   if (!origin) return "*";
@@ -62,11 +70,45 @@ function emitEvent(event) {
   }
 }
 
-function getCodexVersion() {
+async function resolveCodexCommand() {
+  if (resolvedCodexCommand) return resolvedCodexCommand;
+
+  for (const candidate of codexCandidates) {
+    if (candidate.includes("/") && !existsSync(candidate)) continue;
+    const result = await new Promise((resolve) => {
+      execFile(candidate, ["--version"], { timeout: 5000 }, (error, stdout, stderr) => {
+        resolve({
+          ok: !error,
+          version: stdout.trim() || stderr.trim() || null,
+          error: error ? error.message : null,
+        });
+      });
+    });
+    if (result.ok) {
+      resolvedCodexCommand = candidate;
+      return resolvedCodexCommand;
+    }
+  }
+
+  return null;
+}
+
+async function getCodexVersion() {
+  const command = await resolveCodexCommand();
+  if (!command) {
+    return {
+      ok: false,
+      command: null,
+      version: null,
+      error: `Codex was not found. Checked: ${codexCandidates.join(", ")}`,
+    };
+  }
+
   return new Promise((resolve) => {
-    execFile("codex", ["--version"], { timeout: 5000 }, (error, stdout, stderr) => {
+    execFile(command, ["--version"], { timeout: 5000 }, (error, stdout, stderr) => {
       resolve({
         ok: !error,
+        command,
         version: stdout.trim() || stderr.trim() || null,
         error: error ? error.message : null,
       });
@@ -74,13 +116,22 @@ function getCodexVersion() {
   });
 }
 
-async function ensureCodex() {
-  if (codex && !codex.killed) return codex;
+async function spawnCodexAppServer() {
+  const command = await resolveCodexCommand();
+  if (!command) {
+    throw new Error(`Codex was not found. Checked: ${codexCandidates.join(", ")}`);
+  }
 
-  codex = spawn("codex", ["app-server"], {
+  return spawn(command, ["app-server"], {
     stdio: ["pipe", "pipe", "pipe"],
     env: { ...process.env },
   });
+}
+
+async function ensureCodex() {
+  if (codex && !codex.killed) return codex;
+
+  codex = await spawnCodexAppServer();
 
   codex.stderr.on("data", (chunk) => {
     emitEvent({ type: "codex-stderr", text: chunk.toString("utf8") });
@@ -155,10 +206,7 @@ async function rpc(method, params = {}) {
 
 async function ensureCodexProcessOnly() {
   if (codex && !codex.killed) return;
-  codex = spawn("codex", ["app-server"], {
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env },
-  });
+  codex = await spawnCodexAppServer();
 
   codex.stderr.on("data", (chunk) => {
     emitEvent({ type: "codex-stderr", text: chunk.toString("utf8") });

@@ -93,20 +93,47 @@ http://localhost:3000
 
 ## Bridge Setup For Users
 
+Requirements:
+
+- Node.js 20 or newer.
+- Mac: Codex desktop app installed in `/Applications/Codex.app`.
+- Windows: Codex CLI installed and available as `codex` in PowerShell.
+- User is signed in to Codex with their ChatGPT/Codex account.
+
 Primary no-cost setup:
 
 ```bash
 npm install -g tokenguard-bridge && tokenguard-bridge start
 ```
 
-Beginner version:
+Mac beginner version:
 
-1. Open Terminal on Mac, or PowerShell on Windows.
-2. Paste the command above.
-3. Press Enter.
-4. Keep the bridge running.
-5. Return to TokenGuard.
-6. Click `Connect Codex`.
+1. Install the Codex desktop app.
+2. Install Node.js 20 or newer from `nodejs.org`.
+3. Open Terminal with Command + Space, type `Terminal`, then press Enter.
+4. Paste the command above.
+5. Press Enter.
+6. Keep that Terminal window open while using TokenGuard.
+7. Return to TokenGuard.
+8. Click `Check bridge`.
+9. Click `Connect Codex`.
+
+Windows beginner version:
+
+1. Install Node.js 20 or newer from `nodejs.org`.
+2. Install Codex CLI and confirm this works in PowerShell:
+
+```powershell
+codex --version
+```
+
+3. Open PowerShell.
+4. Paste the command above.
+5. Press Enter.
+6. Keep that PowerShell window open while using TokenGuard.
+7. Return to TokenGuard.
+8. Click `Check bridge`.
+9. Click `Connect Codex`.
 
 The website checks for the bridge automatically.
 
@@ -149,6 +176,12 @@ After publishing, users can install the bridge with:
 ```bash
 npm install -g tokenguard-bridge
 tokenguard-bridge start
+```
+
+If users already installed an older bridge version, update with:
+
+```bash
+npm install -g tokenguard-bridge@latest
 ```
 
 ## macOS Bridge Fallback

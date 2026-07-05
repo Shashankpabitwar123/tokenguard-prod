@@ -769,13 +769,14 @@ function ChatPane(props) {
               <div className="w-full max-w-xl rounded-lg border border-slate-200 bg-slate-50 p-5 text-left dark:border-slate-800 dark:bg-slate-900">
                 <h2 className="text-2xl font-semibold tracking-tight">Connect Codex to start</h2>
                 <p className="mt-3 text-sm leading-6 text-slate-500">
-                  TokenGuard stays blank until it can mirror your real Codex account. Install the bridge once, then connect with official Codex login.
+                  TokenGuard stays blank until it can mirror your real Codex account. Install the bridge once on the same computer where Codex is installed, then connect with official Codex login.
                 </p>
                 <div className="space-y-3">
-                  <StepRow number="1" title="Open Terminal" text="On Mac, press Command + Space, type Terminal, then press Enter. On Windows, open PowerShell." />
-                  <StepRow number="2" title="Paste this command" text="This installs the TokenGuard bridge and starts it." code={BRIDGE_INSTALL_COMMAND} />
-                  <StepRow number="3" title="Wait for detection" text={props.bridge?.detail || "TokenGuard checks automatically every few seconds."} />
-                  <StepRow number="4" title="Connect Codex" text="When the bridge is online, click Connect Codex. Official ChatGPT/Codex login will open." />
+                  <StepRow number="1" title="Install prerequisites" text="Mac: install the Codex desktop app and Node.js 20+. Windows: install Node.js 20+ and make sure the Codex CLI command works as codex." />
+                  <StepRow number="2" title="Open Terminal or PowerShell" text="Mac: press Command + Space, type Terminal, press Enter. Windows: open PowerShell." />
+                  <StepRow number="3" title="Paste this command" text="This installs the TokenGuard bridge and starts it. Keep this window open while using TokenGuard." code={BRIDGE_INSTALL_COMMAND} />
+                  <StepRow number="4" title="Wait for detection" text={props.bridge?.detail || "TokenGuard checks automatically every few seconds."} />
+                  <StepRow number="5" title="Connect Codex" text="When the bridge is online, click Connect Codex. Official ChatGPT/Codex login will open." />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button onClick={() => navigator.clipboard?.writeText(BRIDGE_INSTALL_COMMAND)} className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
@@ -880,7 +881,7 @@ function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, optimized }
             <Copy className="h-4 w-4" />
             Copy command
           </button>
-          <div className="mt-3 text-xs leading-5 text-slate-500">Paste this into Terminal or PowerShell. TokenGuard will detect the bridge automatically after it starts.</div>
+          <div className="mt-3 text-xs leading-5 text-slate-500">Mac users need the Codex desktop app and Node.js first. Windows users need Node.js and the Codex CLI available as codex. Keep the terminal window open after the bridge starts.</div>
         </PanelSection>
       </aside>
     );
@@ -1058,10 +1059,11 @@ function SettingsModal({
                 </SettingsCard>
                 <SettingsCard title="How to connect Codex" description="Do this once on the same computer where you use Codex.">
                   <div className="space-y-3 text-sm">
-                    <StepRow number="1" title="Open Terminal or PowerShell" text="Mac: press Command + Space, type Terminal, press Enter. Windows: open PowerShell." />
-                    <StepRow number="2" title="Paste and run this command" text="It installs the small local bridge and starts it." code={BRIDGE_INSTALL_COMMAND} />
-                    <StepRow number="3" title="Return to TokenGuard" text="The website checks automatically. You can also click Check again." />
-                    <StepRow number="4" title="Connect your Codex account" text="Click the button below. Codex opens official ChatGPT login locally; TokenGuard never receives your password." />
+                    <StepRow number="1" title="Install Codex and Node.js" text="Mac: install the Codex desktop app and Node.js 20+. Windows: install Node.js 20+ and confirm codex --version works in PowerShell." />
+                    <StepRow number="2" title="Open Terminal or PowerShell" text="Mac: press Command + Space, type Terminal, press Enter. Windows: open PowerShell." />
+                    <StepRow number="3" title="Paste and run this command" text="It installs the small local bridge and starts it. Keep this window open while using TokenGuard." code={BRIDGE_INSTALL_COMMAND} />
+                    <StepRow number="4" title="Return to TokenGuard" text="The website checks automatically. You can also click Check again." />
+                    <StepRow number="5" title="Connect your Codex account" text="Click the button below. Codex opens official ChatGPT login locally; TokenGuard never receives your password." />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button
