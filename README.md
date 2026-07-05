@@ -96,6 +96,7 @@ http://localhost:3000
 Requirements:
 
 - Node.js 20 or newer.
+- Chrome for the hosted TokenGuard website. Safari may block hosted websites from talking to a local bridge.
 - Mac: Codex desktop app installed in `/Applications/Codex.app`.
 - Windows: Codex CLI installed and available as `codex` in PowerShell.
 - User is signed in to Codex with their ChatGPT/Codex account.

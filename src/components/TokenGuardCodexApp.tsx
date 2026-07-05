@@ -94,12 +94,46 @@ function normalizeThreads(payload: any) {
   })).filter((thread: any) => thread.id);
 }
 
+function projectNameFromPath(cwd: string) {
+  const parts = cwd.split("/").filter(Boolean);
+  return parts[parts.length - 1] || cwd;
+}
+
+function deriveProjectsFromThreads(threads: any[]) {
+  const byCwd = new Map<string, any>();
+  for (const thread of threads) {
+    if (!thread.cwd || byCwd.has(thread.cwd)) continue;
+    byCwd.set(thread.cwd, {
+      id: `codex:${thread.cwd}`,
+      name: projectNameFromPath(thread.cwd),
+      cwd: thread.cwd,
+      source: "codex",
+    });
+  }
+  return Array.from(byCwd.values());
+}
+
+function mergeProjects(manualProjects: any[], mirroredProjects: any[]) {
+  const merged = new Map<string, any>();
+  for (const project of mirroredProjects) merged.set(project.cwd || project.name, project);
+  for (const project of manualProjects) merged.set(project.cwd || project.name, project);
+  return Array.from(merged.values());
+}
+
 function normalizeThreadStatus(status: any) {
   if (!status) return "idle";
   if (typeof status === "string") return status;
   if (typeof status.type === "string") return status.type;
   if (typeof status.state === "string") return status.state;
   return "idle";
+}
+
+function normalizeMessageRole(item: any) {
+  const role = item.role || item.type || item.kind || "codex";
+  if (role === "user" || role === "userMessage") return "user";
+  if (role === "assistant" || role === "agent" || role === "agentMessage" || role === "final_answer") return "codex";
+  if (role === "tokenguard") return "tokenguard";
+  return "codex";
 }
 
 function extractThreadMessages(threadPayload: any) {
@@ -110,7 +144,7 @@ function extractThreadMessages(threadPayload: any) {
   for (const turn of turns) {
     const items = turn.items ?? turn.output ?? [];
     for (const item of items) {
-      const role = item.role || item.type || item.kind || "codex";
+      const role = normalizeMessageRole(item);
       const contentText = Array.isArray(item.content)
         ? item.content
             .map((part: any) => part.text || part.content || "")
@@ -237,7 +271,7 @@ export default function TokenGuardCodexApp() {
       jsonFetch(`/api/projects?email=${encodeURIComponent(userEmail)}`),
     ]);
     setPins(pinsPayload.pins ?? []);
-    setProjects(projectsPayload.projects ?? []);
+    setProjects(mergeProjects(projectsPayload.projects ?? [], deriveProjectsFromThreads(threads)));
     await loadRuns(userEmail);
   }
 
@@ -281,7 +315,7 @@ export default function TokenGuardCodexApp() {
     } catch {
       setBridge({
         status: "offline",
-        detail: "Bridge not reachable. In Chrome, allow Apps on device / Local network access for this site, then reload.",
+        detail: "Use Chrome for bridge connection. If Chrome asks for local access, allow it and reload.",
       });
     }
   }
@@ -317,7 +351,9 @@ export default function TokenGuardCodexApp() {
       `${bridgeUrl}/threads?limit=40${search ? `&search=${encodeURIComponent(search)}` : ""}`,
       bridgeFetchOptions(),
     );
-    setThreads(normalizeThreads(payload));
+    const nextThreads = normalizeThreads(payload);
+    setThreads(nextThreads);
+    setProjects((current) => mergeProjects(current, deriveProjectsFromThreads(nextThreads)));
   }
 
   async function openThread(thread) {
@@ -674,7 +710,7 @@ function Sidebar(props) {
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
           <SectionLabel>Pinned</SectionLabel>
           <div className="mb-4 space-y-1">
-            {props.pins.length === 0 ? <EmptyRow text="No pinned Codex threads yet" /> : props.pins.map((pin) => (
+            {props.pins.length === 0 ? <EmptyRow text="Pin mirrored Codex chats from the Chats list" /> : props.pins.map((pin) => (
               <SidebarRow
                 key={pin.threadId}
                 icon={Pin}
@@ -695,7 +731,7 @@ function Sidebar(props) {
           </div>
           <div className="mb-4 space-y-1">
             {props.projects.length === 0 ? <EmptyRow text="No projects yet" /> : props.projects.map((project) => (
-              <SidebarRow key={project.id || project.name} icon={FolderOpen} title={project.name} meta={project.cwd || "Codex project"} />
+              <SidebarRow key={project.id || project.name} icon={FolderOpen} title={project.name} meta={project.source === "codex" ? "Mirrored from Codex" : project.cwd || "Codex project"} />
             ))}
           </div>
 
@@ -710,6 +746,7 @@ function Sidebar(props) {
                 onClick={() => props.onOpenThread(thread)}
                 actionLabel={pinnedIds.has(thread.id) ? "Pinned" : "Pin"}
                 onAction={() => !pinnedIds.has(thread.id) && props.onPin(thread)}
+                actionVisible
               />
             ))}
           </div>
@@ -1170,7 +1207,7 @@ function EmptyRow({ text }) {
   return <div className="rounded-md px-2.5 py-2 text-xs text-slate-500">{text}</div>;
 }
 
-function SidebarRow({ icon: Icon, title, meta, onClick, actionLabel, onAction }) {
+function SidebarRow({ icon: Icon, title, meta, onClick, actionLabel, onAction, actionVisible = false }) {
   return (
     <div className="group flex items-center gap-2 rounded-md px-2.5 py-2 text-sm hover:bg-white dark:hover:bg-slate-800">
       <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-2 text-left">
@@ -1181,7 +1218,7 @@ function SidebarRow({ icon: Icon, title, meta, onClick, actionLabel, onAction })
         </span>
       </button>
       {actionLabel && (
-        <button onClick={onAction} className="hidden rounded px-1.5 py-1 text-xs text-slate-500 hover:bg-slate-100 group-hover:block dark:hover:bg-slate-900">
+        <button onClick={onAction} className={cx("rounded px-1.5 py-1 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900", actionVisible ? "block" : "hidden group-hover:block")}>
           {actionLabel}
         </button>
       )}
@@ -1191,10 +1228,19 @@ function SidebarRow({ icon: Icon, title, meta, onClick, actionLabel, onAction })
 
 function MessageBlock({ message }) {
   const isUser = message.role === "user";
+  const isCodex = message.role === "codex";
+  const label = isUser ? "You" : isCodex ? "Codex" : "TokenGuard";
   return (
-    <div className={cx("rounded-lg border p-4", isUser ? "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900" : "border-transparent")}>
-      <div className="mb-2 text-xs font-semibold uppercase text-slate-400">{isUser ? "You" : message.role}</div>
-      <div className="whitespace-pre-wrap text-sm leading-6">{message.text}</div>
+    <div className={cx("flex", isCodex ? "justify-end" : "justify-start")}>
+      <div className={cx(
+        "max-w-[82%] rounded-lg border px-4 py-3",
+        isUser && "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900",
+        isCodex && "border-slate-800 bg-slate-950 text-white dark:border-slate-700 dark:bg-slate-900",
+        !isUser && !isCodex && "border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100",
+      )}>
+        <div className={cx("mb-2 text-xs font-semibold uppercase", isCodex ? "text-slate-400" : "text-slate-500")}>{label}</div>
+        <div className="whitespace-pre-wrap text-sm leading-6">{message.text}</div>
+      </div>
     </div>
   );
 }
