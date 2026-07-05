@@ -281,7 +281,7 @@ export default function TokenGuardCodexApp() {
     } catch {
       setBridge({
         status: "offline",
-        detail: "Install and start the bridge using the command below.",
+        detail: "Bridge not reachable. In Chrome, allow Apps on device / Local network access for this site, then reload.",
       });
     }
   }
