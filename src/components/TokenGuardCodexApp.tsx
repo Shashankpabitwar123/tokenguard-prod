@@ -151,7 +151,7 @@ function bridgeFetchOptions(options: RequestInit = {}) {
   return {
     ...options,
     // Chrome's Local Network Access requires this annotation for HTTPS -> localhost.
-    targetAddressSpace: "local",
+    targetAddressSpace: "loopback",
   } as RequestInit;
 }
 
