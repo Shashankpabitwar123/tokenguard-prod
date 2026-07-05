@@ -238,7 +238,7 @@ export default function TokenGuardCodexApp() {
       });
       setAccount(payload.account);
       if (email) {
-        await jsonFetch("/api/bridge-devices", {
+        jsonFetch("/api/bridge-devices", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -246,7 +246,7 @@ export default function TokenGuardCodexApp() {
             deviceName: "Local Codex Bridge",
             metadata: { version: payload.version?.version },
           }),
-        });
+        }).catch(() => undefined);
       }
     } catch {
       setBridge({
