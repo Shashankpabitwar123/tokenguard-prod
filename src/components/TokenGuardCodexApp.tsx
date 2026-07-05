@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 
 const BRIDGE_URL = "http://127.0.0.1:47321";
+const BRIDGE_URLS = [BRIDGE_URL, "http://localhost:47321"];
 const BRIDGE_DOWNLOAD_URL = "/downloads/token-guard-bridge-macos.zip";
 const BRIDGE_INSTALL_COMMAND = "npx -y tokenguard-bridge@latest start";
 
@@ -89,8 +90,16 @@ function normalizeThreads(payload: any) {
     title: thread.name || thread.preview || thread.title || "Untitled Codex thread",
     cwd: thread.cwd || thread.worktreeRoot || thread.metadata?.cwd || "",
     updatedAt: thread.updatedAt || thread.createdAt || thread.recencyAt || null,
-    status: thread.status || "idle",
+    status: normalizeThreadStatus(thread.status),
   })).filter((thread: any) => thread.id);
+}
+
+function normalizeThreadStatus(status: any) {
+  if (!status) return "idle";
+  if (typeof status === "string") return status;
+  if (typeof status.type === "string") return status.type;
+  if (typeof status.state === "string") return status.state;
+  return "idle";
 }
 
 function extractThreadMessages(threadPayload: any) {
@@ -138,6 +147,14 @@ async function jsonFetch(url: string, options?: RequestInit) {
   return payload;
 }
 
+function bridgeFetchOptions(options: RequestInit = {}) {
+  return {
+    ...options,
+    // Chrome's Local Network Access requires this annotation for HTTPS -> localhost.
+    targetAddressSpace: "local",
+  } as RequestInit;
+}
+
 export default function TokenGuardCodexApp() {
   const [email, setEmail] = useState("");
   const [draftEmail, setDraftEmail] = useState("");
@@ -146,6 +163,7 @@ export default function TokenGuardCodexApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bridge, setBridge] = useState({ status: "checking", detail: "Checking local bridge" });
+  const [bridgeUrl, setBridgeUrl] = useState(BRIDGE_URL);
   const [account, setAccount] = useState<any>(null);
   const [threads, setThreads] = useState<any[]>([]);
   const [pins, setPins] = useState<any[]>([]);
@@ -189,8 +207,8 @@ export default function TokenGuardCodexApp() {
 
   useEffect(() => {
     if (!bridgeReady) return;
-    loadCodexAccount();
-    loadThreads();
+    loadCodexAccount().catch(() => undefined);
+    loadThreads().catch(() => undefined);
   }, [bridgeReady]);
 
   useEffect(() => {
@@ -231,7 +249,19 @@ export default function TokenGuardCodexApp() {
   async function refreshBridge() {
     setBridge({ status: "checking", detail: "Checking local bridge" });
     try {
-      const payload = await jsonFetch(`${BRIDGE_URL}/health`);
+      let payload: any = null;
+      let workingBridgeUrl = bridgeUrl;
+      for (const candidateUrl of [bridgeUrl, ...BRIDGE_URLS.filter((url) => url !== bridgeUrl)]) {
+        try {
+          payload = await jsonFetch(`${candidateUrl}/health`, bridgeFetchOptions({ cache: "no-store" }));
+          workingBridgeUrl = candidateUrl;
+          break;
+        } catch {
+          // Try the next local host name. Safari and Chrome can differ here.
+        }
+      }
+      if (!payload) throw new Error("Bridge unavailable");
+      setBridgeUrl(workingBridgeUrl);
       setBridge({
         status: "connected",
         detail: payload.version?.version || "Codex bridge online",
@@ -257,7 +287,7 @@ export default function TokenGuardCodexApp() {
   }
 
   async function startCodexLogin() {
-    const payload = await jsonFetch(`${BRIDGE_URL}/login/start`, { method: "POST" });
+    const payload = await jsonFetch(`${bridgeUrl}/login/start`, bridgeFetchOptions({ method: "POST" }));
     if (payload.login?.authUrl) {
       window.open(payload.login.authUrl, "_blank", "noopener,noreferrer");
     }
@@ -274,7 +304,7 @@ export default function TokenGuardCodexApp() {
 
   async function loadCodexAccount() {
     try {
-      const payload = await jsonFetch(`${BRIDGE_URL}/account`);
+      const payload = await jsonFetch(`${bridgeUrl}/account`, bridgeFetchOptions({ cache: "no-store" }));
       setAccount(payload.account);
     } catch {
       setAccount(null);
@@ -284,7 +314,8 @@ export default function TokenGuardCodexApp() {
   async function loadThreads(search = "") {
     if (!bridgeReady) return;
     const payload = await jsonFetch(
-      `${BRIDGE_URL}/threads?limit=40${search ? `&search=${encodeURIComponent(search)}` : ""}`,
+      `${bridgeUrl}/threads?limit=40${search ? `&search=${encodeURIComponent(search)}` : ""}`,
+      bridgeFetchOptions(),
     );
     setThreads(normalizeThreads(payload));
   }
@@ -292,7 +323,7 @@ export default function TokenGuardCodexApp() {
   async function openThread(thread) {
     setSelectedThread(thread);
     setStatus("loading");
-    const payload = await jsonFetch(`${BRIDGE_URL}/threads/${encodeURIComponent(thread.id)}`);
+    const payload = await jsonFetch(`${bridgeUrl}/threads/${encodeURIComponent(thread.id)}`, bridgeFetchOptions());
     const extracted = extractThreadMessages(payload);
     setMessages(extracted.length ? extracted : [{ role: "codex", text: "Codex thread loaded." }]);
     setStatus("idle");
@@ -397,17 +428,17 @@ export default function TokenGuardCodexApp() {
 
     try {
       if (selectedThread?.id) {
-        await jsonFetch(`${BRIDGE_URL}/threads/${encodeURIComponent(selectedThread.id)}/turn`, {
+        await jsonFetch(`${bridgeUrl}/threads/${encodeURIComponent(selectedThread.id)}/turn`, bridgeFetchOptions({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: nextOptimized }),
-        });
+        }));
       } else {
-        const payload = await jsonFetch(`${BRIDGE_URL}/threads/start`, {
+        const payload = await jsonFetch(`${bridgeUrl}/threads/start`, bridgeFetchOptions({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: nextOptimized }),
-        });
+        }));
         if (payload.thread) {
           setSelectedThread({
             id: payload.thread.id,
