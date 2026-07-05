@@ -87,11 +87,19 @@ function normalizeThreads(payload: any) {
   const raw = payload?.threads ?? payload?.data ?? payload?.items ?? payload?.result?.threads ?? [];
   return raw.map((thread: any) => ({
     id: thread.id ?? thread.threadId ?? thread.sessionId,
-    title: thread.name || thread.preview || thread.title || "Untitled Codex thread",
+    title: getThreadTitle(thread),
     cwd: thread.cwd || thread.worktreeRoot || thread.metadata?.cwd || "",
     updatedAt: thread.updatedAt || thread.createdAt || thread.recencyAt || null,
     status: normalizeThreadStatus(thread.status),
   })).filter((thread: any) => thread.id);
+}
+
+function getThreadTitle(thread: any) {
+  const title = thread?.name || thread?.title || thread?.displayTitle || thread?.preview;
+  if (typeof title === "string" && title.trim()) {
+    return title.trim().split("\n")[0].slice(0, 80);
+  }
+  return "Untitled Codex thread";
 }
 
 function projectNameFromPath(cwd: string) {
@@ -360,10 +368,28 @@ export default function TokenGuardCodexApp() {
     setSelectedThread(thread);
     setStatus("loading");
     const payload = await jsonFetch(`${bridgeUrl}/threads/${encodeURIComponent(thread.id)}`, bridgeFetchOptions());
+    const payloadThread = payload?.thread ?? payload;
+    setSelectedThread({
+      ...thread,
+      id: payloadThread.id ?? payloadThread.sessionId ?? thread.id,
+      title: getThreadTitle(payloadThread),
+      cwd: payloadThread.cwd || thread.cwd || "",
+    });
     const extracted = extractThreadMessages(payload);
     setMessages(extracted.length ? extracted : [{ role: "codex", text: "Codex thread loaded." }]);
     setStatus("idle");
     setSidebarOpen(false);
+  }
+
+  async function refreshThreadMessages(thread) {
+    if (!thread?.id) return;
+    try {
+      const payload = await jsonFetch(`${bridgeUrl}/threads/${encodeURIComponent(thread.id)}`, bridgeFetchOptions({ cache: "no-store" }));
+      const extracted = extractThreadMessages(payload);
+      if (extracted.length) setMessages(extracted);
+    } catch {
+      // The run may still be starting in Codex; keep the optimistic messages.
+    }
   }
 
   async function pinThread(thread) {
@@ -463,12 +489,37 @@ export default function TokenGuardCodexApp() {
     }
 
     try {
+      let activeThread = selectedThread;
       if (selectedThread?.id) {
-        await jsonFetch(`${bridgeUrl}/threads/${encodeURIComponent(selectedThread.id)}/turn`, bridgeFetchOptions({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: nextOptimized }),
-        }));
+        try {
+          await jsonFetch(`${bridgeUrl}/threads/${encodeURIComponent(selectedThread.id)}/turn`, bridgeFetchOptions({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: nextOptimized, cwd: selectedThread.cwd || null }),
+          }));
+        } catch (error) {
+          if (!String(error.message || "").toLowerCase().includes("thread not found")) throw error;
+          const payload = await jsonFetch(`${bridgeUrl}/threads/start`, bridgeFetchOptions({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: nextOptimized, cwd: selectedThread.cwd || null }),
+          }));
+          if (payload.thread) {
+            activeThread = {
+              id: payload.thread.id,
+              title: getThreadTitle(payload.thread) || selectedThread.title,
+              cwd: payload.thread.cwd || selectedThread.cwd || "",
+            };
+            setSelectedThread(activeThread);
+          }
+          setMessages((current) => [
+            ...current,
+            {
+              role: "tokenguard",
+              text: "The original Codex thread could not accept a new turn, so TokenGuard started a new Codex thread in the same project.",
+            },
+          ]);
+        }
       } else {
         const payload = await jsonFetch(`${bridgeUrl}/threads/start`, bridgeFetchOptions({
           method: "POST",
@@ -476,10 +527,12 @@ export default function TokenGuardCodexApp() {
           body: JSON.stringify({ prompt: nextOptimized }),
         }));
         if (payload.thread) {
-          setSelectedThread({
+          activeThread = {
             id: payload.thread.id,
-            title: payload.thread.name || payload.thread.preview || prompt.trim().slice(0, 64),
-          });
+            title: getThreadTitle(payload.thread) || prompt.trim().slice(0, 64),
+            cwd: payload.thread.cwd || "",
+          };
+          setSelectedThread(activeThread);
         }
       }
       setStatus("running");
@@ -491,6 +544,8 @@ export default function TokenGuardCodexApp() {
         },
       ]);
       await loadThreads();
+      window.setTimeout(() => refreshThreadMessages(activeThread), 2500);
+      window.setTimeout(() => refreshThreadMessages(activeThread), 8000);
     } catch (error) {
       setStatus("blocked");
       setMessages((current) => [...current, { role: "tokenguard", text: error.message }]);
