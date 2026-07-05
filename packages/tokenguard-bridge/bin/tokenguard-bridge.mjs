@@ -64,7 +64,30 @@ async function printStatus() {
   }
 }
 
+async function getRunningBridge() {
+  try {
+    const response = await fetch(healthUrl);
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 async function startBridge() {
+  const running = await getRunningBridge();
+  if (running?.ok && running?.bridge === "tokenguard") {
+    console.log("TokenGuard Bridge is already running.");
+    console.log(`Bridge: ${running.bridge}`);
+    console.log(`Codex: ${running.version?.version || "unknown"}`);
+    if (running.account?.account?.email) {
+      console.log(`Account: ${running.account.account.email}`);
+    }
+    console.log("");
+    console.log("Open https://tokenguard-prod.vercel.app and click Check bridge.");
+    return;
+  }
+
   const codex = await checkCodex();
   if (!codex.ok) {
     console.error("Codex was not found.");

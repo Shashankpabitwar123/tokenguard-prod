@@ -1,6 +1,6 @@
 {
   "name": "tokenguard-bridge",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local Codex bridge for TokenGuard.",
   "type": "module",
   "bin": {
