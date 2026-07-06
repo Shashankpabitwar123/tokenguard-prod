@@ -10,14 +10,12 @@ import {
   Circle,
   Copy,
   Download,
-  FolderOpen,
   Gauge,
   KeyRound,
   Laptop,
   Menu,
   MessageSquareText,
   Moon,
-  Pin,
   Play,
   Plus,
   Search,
@@ -83,57 +81,12 @@ Acceptance:
 - Run the smallest useful validation command.`;
 }
 
-function normalizeThreads(payload: any) {
-  const raw = payload?.threads ?? payload?.data ?? payload?.items ?? payload?.result?.threads ?? [];
-  return raw.map((thread: any) => ({
-    id: thread.id ?? thread.threadId ?? thread.sessionId,
-    title: getThreadTitle(thread),
-    cwd: thread.cwd || thread.worktreeRoot || thread.metadata?.cwd || "",
-    updatedAt: thread.updatedAt || thread.createdAt || thread.recencyAt || null,
-    status: normalizeThreadStatus(thread.status),
-  })).filter((thread: any) => thread.id);
-}
-
 function getThreadTitle(thread: any) {
   const title = thread?.name || thread?.title || thread?.displayTitle || thread?.preview;
   if (typeof title === "string" && title.trim()) {
     return title.trim().split("\n")[0].slice(0, 80);
   }
   return "Untitled Codex thread";
-}
-
-function projectNameFromPath(cwd: string) {
-  const parts = cwd.split("/").filter(Boolean);
-  return parts[parts.length - 1] || cwd;
-}
-
-function deriveProjectsFromThreads(threads: any[]) {
-  const byCwd = new Map<string, any>();
-  for (const thread of threads) {
-    if (!thread.cwd || byCwd.has(thread.cwd)) continue;
-    byCwd.set(thread.cwd, {
-      id: `codex:${thread.cwd}`,
-      name: projectNameFromPath(thread.cwd),
-      cwd: thread.cwd,
-      source: "codex",
-    });
-  }
-  return Array.from(byCwd.values());
-}
-
-function mergeProjects(manualProjects: any[], mirroredProjects: any[]) {
-  const merged = new Map<string, any>();
-  for (const project of mirroredProjects) merged.set(project.cwd || project.name, project);
-  for (const project of manualProjects) merged.set(project.cwd || project.name, project);
-  return Array.from(merged.values());
-}
-
-function normalizeThreadStatus(status: any) {
-  if (!status) return "idle";
-  if (typeof status === "string") return status;
-  if (typeof status.type === "string") return status.type;
-  if (typeof status.state === "string") return status.state;
-  return "idle";
 }
 
 function normalizeMessageRole(item: any) {
@@ -198,16 +151,15 @@ function bridgeFetchOptions(options: RequestInit = {}) {
 }
 
 export default function TokenGuardCodexApp() {
-  const [email, setEmail] = useState("");
-  const [draftEmail, setDraftEmail] = useState("");
-  const [theme, setTheme] = useState("light");
+  const [email, setEmail] = useState(() => typeof window === "undefined" ? "" : window.localStorage.getItem("tokenguard_email") || "");
+  const [draftEmail, setDraftEmail] = useState(() => typeof window === "undefined" ? "" : window.localStorage.getItem("tokenguard_email") || "");
+  const [theme, setTheme] = useState(() => typeof window === "undefined" ? "light" : window.localStorage.getItem("tokenguard_theme") || "light");
   const [mode, setMode] = useState("balanced");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bridge, setBridge] = useState({ status: "checking", detail: "Checking local bridge" });
   const [bridgeUrl, setBridgeUrl] = useState(BRIDGE_URL);
   const [account, setAccount] = useState<any>(null);
-  const [threads, setThreads] = useState<any[]>([]);
   const [pins, setPins] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [runs, setRuns] = useState<any[]>([]);
@@ -226,14 +178,6 @@ export default function TokenGuardCodexApp() {
   const codexReady = Boolean(account?.account);
 
   useEffect(() => {
-    const storedEmail = window.localStorage.getItem("tokenguard_email") || "";
-    const storedTheme = window.localStorage.getItem("tokenguard_theme") || "light";
-    setEmail(storedEmail);
-    setDraftEmail(storedEmail);
-    setTheme(storedTheme);
-  }, []);
-
-  useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     window.localStorage.setItem("tokenguard_theme", theme);
   }, [theme]);
@@ -250,7 +194,6 @@ export default function TokenGuardCodexApp() {
   useEffect(() => {
     if (!bridgeReady) return;
     loadCodexAccount().catch(() => undefined);
-    loadThreads().catch(() => undefined);
   }, [bridgeReady]);
 
   useEffect(() => {
@@ -279,7 +222,7 @@ export default function TokenGuardCodexApp() {
       jsonFetch(`/api/projects?email=${encodeURIComponent(userEmail)}`),
     ]);
     setPins(pinsPayload.pins ?? []);
-    setProjects(mergeProjects(projectsPayload.projects ?? [], deriveProjectsFromThreads(threads)));
+    setProjects(projectsPayload.projects ?? []);
     await loadRuns(userEmail);
   }
 
@@ -353,17 +296,6 @@ export default function TokenGuardCodexApp() {
     }
   }
 
-  async function loadThreads(search = "") {
-    if (!bridgeReady) return;
-    const payload = await jsonFetch(
-      `${bridgeUrl}/threads?limit=40${search ? `&search=${encodeURIComponent(search)}` : ""}`,
-      bridgeFetchOptions(),
-    );
-    const nextThreads = normalizeThreads(payload);
-    setThreads(nextThreads);
-    setProjects((current) => mergeProjects(current, deriveProjectsFromThreads(nextThreads)));
-  }
-
   async function openThread(thread) {
     setSelectedThread(thread);
     setStatus("loading");
@@ -379,17 +311,6 @@ export default function TokenGuardCodexApp() {
     setMessages(extracted.length ? extracted : [{ role: "codex", text: "Codex thread loaded." }]);
     setStatus("idle");
     setSidebarOpen(false);
-  }
-
-  async function refreshThreadMessages(thread) {
-    if (!thread?.id) return;
-    try {
-      const payload = await jsonFetch(`${bridgeUrl}/threads/${encodeURIComponent(thread.id)}`, bridgeFetchOptions({ cache: "no-store" }));
-      const extracted = extractThreadMessages(payload);
-      if (extracted.length) setMessages(extracted);
-    } catch {
-      // The run may still be starting in Codex; keep the optimistic messages.
-    }
   }
 
   async function pinThread(thread) {
@@ -441,9 +362,10 @@ export default function TokenGuardCodexApp() {
   async function optimizeOnly() {
     if (!prompt.trim()) return;
     setOptimized(optimizedPrompt);
+    navigator.clipboard?.writeText(optimizedPrompt).catch(() => undefined);
     setMessages([
       { role: "user", text: prompt },
-      { role: "tokenguard", text: `Prepared optimized Codex prompt. Estimated savings: ${stats.saved}%.` },
+      { role: "tokenguard", text: `Optimized prompt prepared and copied. Estimated savings: ${stats.saved}%.` },
     ]);
     setStatus("ready");
   }
@@ -476,81 +398,7 @@ export default function TokenGuardCodexApp() {
     });
     setLastRun(runPayload.run);
     await loadRuns(email);
-
-    if (!bridgeReady || !codexReady) {
-      setStatus("ready");
-      setMessages((current) => [
-        ...current,
-        {
-          role: "tokenguard",
-          text: nextOptimized,
-        },
-      ]);
-      return;
-    }
-
-    try {
-      let activeThread = selectedThread;
-      if (selectedThread?.id) {
-        try {
-          await jsonFetch(`${bridgeUrl}/threads/${encodeURIComponent(selectedThread.id)}/turn`, bridgeFetchOptions({
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: nextOptimized, cwd: selectedThread.cwd || null }),
-          }));
-        } catch (error) {
-          if (!String(error.message || "").toLowerCase().includes("thread not found")) throw error;
-          const payload = await jsonFetch(`${bridgeUrl}/threads/start`, bridgeFetchOptions({
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: nextOptimized, cwd: selectedThread.cwd || null }),
-          }));
-          if (payload.thread) {
-            activeThread = {
-              id: payload.thread.id,
-              title: getThreadTitle(payload.thread) || selectedThread.title,
-              cwd: payload.thread.cwd || selectedThread.cwd || "",
-            };
-            setSelectedThread(activeThread);
-          }
-          setMessages((current) => [
-            ...current,
-            {
-              role: "tokenguard",
-              text: "The original Codex thread could not accept a new turn, so TokenGuard started a new Codex thread in the same project.",
-            },
-          ]);
-        }
-      } else {
-        const payload = await jsonFetch(`${bridgeUrl}/threads/start`, bridgeFetchOptions({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: nextOptimized }),
-        }));
-        if (payload.thread) {
-          activeThread = {
-            id: payload.thread.id,
-            title: getThreadTitle(payload.thread) || prompt.trim().slice(0, 64),
-            cwd: payload.thread.cwd || "",
-          };
-          setSelectedThread(activeThread);
-        }
-      }
-      setStatus("running");
-      setMessages((current) => [
-        ...current,
-        {
-          role: "codex",
-          text: "Optional bridge run started locally. Continue approvals in Codex if it asks.",
-        },
-      ]);
-      await loadThreads();
-      window.setTimeout(() => refreshThreadMessages(activeThread), 2500);
-      window.setTimeout(() => refreshThreadMessages(activeThread), 8000);
-    } catch (error) {
-      setStatus("blocked");
-      setMessages((current) => [...current, { role: "tokenguard", text: error.message }]);
-    }
+    setStatus("ready");
   }
 
   if (!isAuthed) {
@@ -617,6 +465,7 @@ export default function TokenGuardCodexApp() {
           pins={pins}
           projects={projects}
           bridge={bridge}
+          runs={runs}
           onClose={() => setSidebarOpen(false)}
           onNewChat={newChat}
           onOpenThread={openThread}
@@ -725,7 +574,6 @@ function Header({ theme, setTheme }) {
 }
 
 function Sidebar(props) {
-  const pinnedIds = new Set(props.pins.map((pin) => pin.threadId));
   return (
     <>
       <aside
@@ -755,7 +603,7 @@ function Sidebar(props) {
         <div className="space-y-2 p-3">
           <button onClick={props.onNewChat} className="flex w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-800">
             <Plus className="h-4 w-4" />
-            New chat
+            New optimization
           </button>
           <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800">
             <Search className="h-4 w-4" />
@@ -764,45 +612,14 @@ function Sidebar(props) {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-          <SectionLabel>Pinned</SectionLabel>
-          <div className="mb-4 space-y-1">
-            {props.pins.length === 0 ? <EmptyRow text="Saved optimizations appear here" /> : props.pins.map((pin) => (
-              <SidebarRow
-                key={pin.threadId}
-                icon={Pin}
-                title={pin.title}
-                meta="Pinned locally"
-                onClick={() => props.onOpenThread({ id: pin.threadId, title: pin.title })}
-                actionLabel="Unpin"
-                onAction={() => props.onUnpin(pin.threadId)}
-              />
-            ))}
-          </div>
-
-          <div className="mb-1 flex items-center justify-between">
-            <SectionLabel>Projects</SectionLabel>
-            <button onClick={props.onCreateProject} className="rounded p-1 hover:bg-white dark:hover:bg-slate-800">
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="mb-4 space-y-1">
-            {props.projects.length === 0 ? <EmptyRow text="No projects yet" /> : props.projects.map((project) => (
-              <SidebarRow key={project.id || project.name} icon={FolderOpen} title={project.name} meta={project.source === "codex" ? "Mirrored from Codex" : project.cwd || "Codex project"} />
-            ))}
-          </div>
-
-          <SectionLabel>Chats</SectionLabel>
+          <SectionLabel>Recent Optimizations</SectionLabel>
           <div className="space-y-1">
-            {props.threads.length === 0 ? <EmptyRow text="Optional: connect bridge to view Codex threads" /> : props.threads.map((thread) => (
+            {props.runs.length === 0 ? <EmptyRow text="No saved optimization runs yet" /> : props.runs.slice(0, 12).map((run) => (
               <SidebarRow
-                key={thread.id}
+                key={run.id}
                 icon={MessageSquareText}
-                title={thread.title}
-                meta={thread.status}
-                onClick={() => props.onOpenThread(thread)}
-                actionLabel={pinnedIds.has(thread.id) ? "Pinned" : "Pin"}
-                onAction={() => !pinnedIds.has(thread.id) && props.onPin(thread)}
-                actionVisible
+                title={run.title}
+                meta={`${run.savedPercent}% saved`}
               />
             ))}
           </div>
@@ -942,7 +759,26 @@ function ChatPane(props) {
         ) : (
           <div className="mx-auto max-w-3xl space-y-5">
             {props.messages.map((message, index) => <MessageBlock key={`${message.role}-${index}`} message={message} />)}
-            {props.status === "running" && <div className="flex items-center gap-2 text-sm text-slate-500"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />Codex is running locally...</div>}
+            {props.optimized && (
+              <div className="rounded-lg border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900 dark:bg-slate-900">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold">Optimized Codex Prompt</div>
+                    <div className="text-xs text-slate-500">{props.stats.saved}% estimated savings · paste this into Codex</div>
+                  </div>
+                  <button
+                    onClick={() => navigator.clipboard?.writeText(props.optimized)}
+                    className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copy
+                  </button>
+                </div>
+                <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-5 text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+                  {props.optimized}
+                </pre>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -966,7 +802,7 @@ function ChatPane(props) {
               </button>
               <button onClick={props.runWithCodex} disabled={!props.prompt.trim() || props.status === "running"} className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950">
                 <Play className="h-4 w-4" />
-                Copy / Run
+                Copy Optimized
               </button>
             </div>
           </div>
@@ -983,33 +819,6 @@ function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, optimized }
     ? Math.round(runs.reduce((sum, run) => sum + Number(run.savedPercent || 0), 0) / runs.length)
     : 0;
   const persistedRun = lastRun || runs[0];
-  if (!codexConnected || bridge.status !== "connected") {
-    return (
-      <aside className="hidden w-[340px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 xl:block">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold">Codex setup</h2>
-            <p className="text-xs text-slate-500">Savings appear after real Codex runs</p>
-          </div>
-          <Laptop className="h-5 w-5 text-slate-500" />
-        </div>
-        <PanelSection title="Connection status">
-          <RuleRow>Bridge: {bridge.status}</RuleRow>
-          <RuleRow>Codex account: {codexConnected ? "connected" : "not connected"}</RuleRow>
-        </PanelSection>
-        <PanelSection title="Setup">
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-5 dark:border-slate-800 dark:bg-slate-900">
-            {BRIDGE_INSTALL_COMMAND}
-          </div>
-          <button onClick={() => navigator.clipboard?.writeText(BRIDGE_INSTALL_COMMAND)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-white dark:text-slate-950">
-            <Copy className="h-4 w-4" />
-            Copy command
-          </button>
-          <div className="mt-3 text-xs leading-5 text-slate-500">Mac users need the Codex desktop app and Node.js first. Windows users need Node.js and the Codex CLI available as codex. Keep the terminal window open after the bridge starts.</div>
-        </PanelSection>
-      </aside>
-    );
-  }
   return (
     <aside className="hidden w-[340px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950 xl:block">
       <div className="mb-4 flex items-center justify-between">
@@ -1053,9 +862,9 @@ function SavingsPanel({ stats, mode, bridge, account, runs, lastRun, optimized }
         )}
       </PanelSection>
       <PanelSection title="Connection">
-        <RuleRow>{bridge.status === "connected" ? "Local bridge online" : bridge.detail}</RuleRow>
-        <RuleRow>{codexConnected ? "Codex account connected locally" : "Codex login required"}</RuleRow>
-        <RuleRow>Full conversations remain in Codex/local Codex storage</RuleRow>
+        <RuleRow>Core product uses copy-paste, no sync required</RuleRow>
+        <RuleRow>{bridge.status === "connected" ? "Optional bridge online" : "Optional bridge offline"}</RuleRow>
+        <RuleRow>{codexConnected ? "Codex account detected locally" : "Codex login not needed for copy mode"}</RuleRow>
       </PanelSection>
       <PanelSection title="Codex rulebook">
         {codexRules.map((rule) => <RuleRow key={rule}>{rule}</RuleRow>)}
