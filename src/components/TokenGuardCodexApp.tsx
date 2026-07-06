@@ -453,12 +453,13 @@ export default function TokenGuardCodexApp() {
     const nextOptimized = optimizedPrompt;
     setOptimized(nextOptimized);
     setStatus("running");
+    navigator.clipboard?.writeText(nextOptimized).catch(() => undefined);
     setMessages((current) => [
       ...current,
       { role: "user", text: prompt },
       {
         role: "tokenguard",
-        text: `Sending optimized prompt to Codex through the local bridge. Estimated savings: ${stats.saved}%.`,
+        text: `Optimized prompt prepared and copied. Estimated savings: ${stats.saved}%.`,
       },
     ]);
 
@@ -477,12 +478,12 @@ export default function TokenGuardCodexApp() {
     await loadRuns(email);
 
     if (!bridgeReady || !codexReady) {
-      setStatus("blocked");
+      setStatus("ready");
       setMessages((current) => [
         ...current,
         {
           role: "tokenguard",
-          text: "Codex is not connected yet. Start the bridge, complete Codex login, then run again.",
+          text: nextOptimized,
         },
       ]);
       return;
@@ -540,7 +541,7 @@ export default function TokenGuardCodexApp() {
         ...current,
         {
           role: "codex",
-          text: "Codex run started locally. Open the Codex app/terminal for full live approvals while TokenGuard refreshes this mirrored thread.",
+          text: "Optional bridge run started locally. Continue approvals in Codex if it asks.",
         },
       ]);
       await loadThreads();
@@ -561,14 +562,14 @@ export default function TokenGuardCodexApp() {
             <section>
               <div className="mb-4 inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
                 <Gauge className="h-4 w-4 text-emerald-600" />
-                Codex token-saving mirror
+                Codex context optimizer
               </div>
               <h1 className="max-w-2xl text-4xl font-semibold tracking-tight md:text-5xl">
-                Use Codex from TokenGuard, with less repeated context.
+                Prepare cleaner Codex prompts with less repeated context.
               </h1>
               <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 dark:text-slate-400">
-                TokenGuard is a lightweight Codex dashboard. Your ChatGPT/Codex login stays local
-                through Codex, while TokenGuard stores only your account, pins, projects, and savings stats.
+                TokenGuard does not try to replace or sync Codex. It rewrites messy tasks into compact,
+                structured prompts and shows estimated token savings before you paste or run them.
               </p>
             </section>
 
@@ -597,7 +598,7 @@ export default function TokenGuardCodexApp() {
                 <ArrowRight className="h-4 w-4" />
               </button>
               <p className="mt-3 text-xs leading-5 text-slate-500">
-                Codex login happens next through the local Codex bridge. We do not ask for a ChatGPT password or API key.
+                The bridge is optional. You can use TokenGuard just to optimize and copy prompts.
               </p>
             </section>
           </main>
@@ -710,7 +711,7 @@ function Header({ theme, setTheme }) {
         </div>
         <div>
           <div className="font-semibold">TokenGuard</div>
-          <div className="text-xs text-slate-500">Codex token-saving mirror</div>
+          <div className="text-xs text-slate-500">Codex context optimizer</div>
         </div>
       </div>
       <button
@@ -742,7 +743,7 @@ function Sidebar(props) {
               <div className="text-sm font-semibold">TokenGuard</div>
               <div className="flex items-center gap-1.5 text-xs text-slate-500">
                 <span className={cx("h-1.5 w-1.5 rounded-full", props.bridge.status === "connected" ? "bg-emerald-500" : "bg-slate-400")} />
-                Codex {props.bridge.status}
+                Bridge {props.bridge.status}
               </div>
             </div>
           </div>
@@ -765,7 +766,7 @@ function Sidebar(props) {
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
           <SectionLabel>Pinned</SectionLabel>
           <div className="mb-4 space-y-1">
-            {props.pins.length === 0 ? <EmptyRow text="Pin mirrored Codex chats from the Chats list" /> : props.pins.map((pin) => (
+            {props.pins.length === 0 ? <EmptyRow text="Saved optimizations appear here" /> : props.pins.map((pin) => (
               <SidebarRow
                 key={pin.threadId}
                 icon={Pin}
@@ -792,7 +793,7 @@ function Sidebar(props) {
 
           <SectionLabel>Chats</SectionLabel>
           <div className="space-y-1">
-            {props.threads.length === 0 ? <EmptyRow text="Connect Codex to mirror chats" /> : props.threads.map((thread) => (
+            {props.threads.length === 0 ? <EmptyRow text="Optional: connect bridge to view Codex threads" /> : props.threads.map((thread) => (
               <SidebarRow
                 key={thread.id}
                 icon={MessageSquareText}
@@ -829,7 +830,7 @@ function TopBar({ bridge, account, mode, setMode, onMenu, onRefreshBridge, onSta
         </button>
         <div className="hidden items-center gap-2 text-sm text-slate-600 dark:text-slate-400 sm:flex">
           <TerminalSquare className="h-4 w-4" />
-          <span className="truncate">Codex mirror workspace</span>
+          <span className="truncate">Context optimizer workspace</span>
         </div>
       </div>
 
@@ -851,7 +852,7 @@ function TopBar({ bridge, account, mode, setMode, onMenu, onRefreshBridge, onSta
         {bridge.status !== "connected" ? (
           <button onClick={onRefreshBridge} className="hidden items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm sm:flex dark:border-slate-800">
             <Laptop className="h-4 w-4" />
-            Bridge setup
+            Optional bridge
           </button>
         ) : !codexConnected ? (
           <button onClick={onStartLogin} className="hidden items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white sm:flex dark:bg-white dark:text-slate-950">
@@ -874,11 +875,11 @@ function TopBar({ bridge, account, mode, setMode, onMenu, onRefreshBridge, onSta
 
 function ChatPane(props) {
   const hasMessages = props.messages.length > 0;
-  const needsSetup = !props.bridgeReady || !props.codexReady;
+  const needsSetup = false;
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-white dark:bg-slate-950">
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2 text-xs text-slate-500 dark:border-slate-800">
-        <span>{props.selectedThread ? props.selectedThread.title : "New Codex chat"}</span>
+        <span>{props.selectedThread ? props.selectedThread.title : "New optimization"}</span>
         <span>{props.stats.saved}% estimated savings</span>
       </div>
 
@@ -890,9 +891,9 @@ function ChatPane(props) {
             </div>
             {needsSetup && (
               <div className="w-full max-w-xl rounded-lg border border-slate-200 bg-slate-50 p-5 text-left dark:border-slate-800 dark:bg-slate-900">
-                <h2 className="text-2xl font-semibold tracking-tight">Connect Codex to start</h2>
+                <h2 className="text-2xl font-semibold tracking-tight">Optional Codex bridge</h2>
                 <p className="mt-3 text-sm leading-6 text-slate-500">
-                  TokenGuard stays blank until it can mirror your real Codex account. Install the bridge once on the same computer where Codex is installed, then connect with official Codex login.
+                  TokenGuard works without sync. Install the bridge only if you want to send optimized prompts to local Codex from this page.
                 </p>
                 <div className="space-y-3">
                   <StepRow number="1" title="Install prerequisites" text="Mac: install the Codex desktop app and Node.js 20+. Windows: install Node.js 20+ and make sure the Codex CLI command works as codex." />
@@ -926,7 +927,7 @@ function ChatPane(props) {
               <>
                 <h2 className="text-2xl font-semibold tracking-tight">What should Codex work on?</h2>
                 <p className="mt-3 max-w-lg text-sm leading-6 text-slate-500">
-                  TokenGuard optimizes the task first, then sends it to your local Codex session.
+                  TokenGuard creates a compact prompt you can copy into Codex. Optional bridge support can run it locally.
                 </p>
                 <div className="mt-6 flex flex-wrap justify-center gap-2">
                   {["Fix a bug", "Review a diff", "Explain this repo"].map((item) => (
@@ -951,13 +952,13 @@ function ChatPane(props) {
           <textarea
             value={props.prompt}
             onChange={(event) => props.setPrompt(event.target.value)}
-            placeholder="Message TokenGuard to run Codex with optimized context..."
+            placeholder="Describe the Codex task you want to optimize..."
             className="min-h-24 w-full resize-none rounded-t-lg border-0 bg-transparent px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400"
           />
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-3 py-2 dark:border-slate-800">
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <Circle className={cx("h-2.5 w-2.5 fill-current", props.bridgeReady && props.codexReady ? "text-emerald-500" : "text-slate-400")} />
-              {props.bridgeReady && props.codexReady ? "Ready to run in Codex" : "Bridge or Codex login needed"}
+              {props.bridgeReady && props.codexReady ? "Optional bridge connected" : "Copy mode: no sync required"}
             </div>
             <div className="flex items-center gap-2">
               <button onClick={props.optimizeOnly} disabled={!props.prompt.trim()} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 dark:border-slate-800 dark:hover:bg-slate-800">
@@ -965,7 +966,7 @@ function ChatPane(props) {
               </button>
               <button onClick={props.runWithCodex} disabled={!props.prompt.trim() || props.status === "running"} className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-white dark:text-slate-950">
                 <Play className="h-4 w-4" />
-                Optimize & Run
+                Copy / Run
               </button>
             </div>
           </div>

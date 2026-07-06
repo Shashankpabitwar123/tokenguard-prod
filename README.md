@@ -1,45 +1,33 @@
 # TokenGuard
 
-TokenGuard is a Codex-first workspace that helps developers reduce repeated context before sending tasks to Codex. It mirrors the user's local Codex threads through a desktop bridge, keeps ChatGPT/Codex authentication local, and stores only TokenGuard metadata such as pins, projects, bridge status, and savings statistics.
+TokenGuard is a Codex context optimizer. It does not try to replace Codex, mirror every chat, or sync plugins. Instead, it helps developers turn messy requests into compact, structured Codex prompts and shows estimated token savings before the prompt is pasted or optionally sent to Codex.
 
 Live app: https://tokenguard-prod.vercel.app
 
-## Why It Exists
+## Why This Pivot
 
-Codex sessions can become expensive when users repeatedly resend broad context, old logs, unrelated files, or long chat history. TokenGuard sits in front of Codex and prepares a compact task packet with focused instructions, relevant context strategy, and provider-specific rules.
+The original mirror idea was too dependent on platform sync that Codex does not fully expose: pinned chats, projects, plugin state, and two-way thread updates are not reliable enough for a polished product.
 
-The goal is simple:
-
-```text
-Use Codex normally, but send less unnecessary context.
-```
-
-## User Flow
+The production-safe version is simpler:
 
 ```text
-TokenGuard login
-→ Copy one install command
-→ Paste it into Terminal or PowerShell once
-→ Connect Codex with official ChatGPT/Codex login
-→ TokenGuard mirrors real Codex history
-→ User runs optimized Codex tasks
+User writes a messy task
+→ TokenGuard rewrites it into a focused Codex prompt
+→ TokenGuard estimates token savings
+→ User copies it into Codex or optionally runs it through a local bridge
 ```
-
-Before Codex is connected, the app intentionally stays blank. It does not show fake chats, fake projects, or fake savings.
 
 ## Features
 
-- Codex-only primary workflow.
-- Email-based TokenGuard account creation.
-- Local bridge detection at `127.0.0.1:47321`.
-- NPM-first bridge setup with copyable beginner-friendly instructions.
-- Official Codex/ChatGPT login initiated through the local bridge.
-- Real Codex thread listing and reading through `codex app-server`.
-- Optimized prompt generation before sending tasks to Codex.
-- Backend-backed savings panel using Neon Postgres.
-- Pins, projects, bridge devices, settings, and run history.
+- Email-based TokenGuard account.
+- Prompt optimization modes: fast, balanced, deep.
+- Token savings estimator.
+- Copy-ready optimized prompt.
+- Saved optimization runs in the backend.
+- Optional local Codex bridge for users who want direct send.
 - Dark mode.
-- No ChatGPT passwords, cookies, or API keys stored by TokenGuard.
+- No ChatGPT password, cookies, or API keys stored by TokenGuard.
+- No promise of full Codex chat, pin, project, or plugin sync.
 
 ## Architecture
 
@@ -47,36 +35,33 @@ Before Codex is connected, the app intentionally stays blank. It does not show f
 TokenGuard Web App
   - Next.js App Router
   - Vercel deployment
-  - account, settings, pins, projects, savings stats
-
-TokenGuard Codex Bridge
-  - local helper on the user's laptop
-  - wraps `codex app-server`
-  - exposes a localhost API for the web app
-  - keeps Codex auth local
+  - prompt optimization UI
+  - savings dashboard
 
 Neon Postgres
-  - stores TokenGuard metadata only
-  - does not store full Codex conversations
+  - stores account metadata and optimization runs
+
+Optional TokenGuard Bridge
+  - local Node.js helper
+  - talks to local Codex when available
+  - not required for the core product
 ```
 
 ## Privacy Model
 
 TokenGuard stores:
 
-- TokenGuard user account
-- Bridge device status
-- Pinned Codex thread IDs and titles
-- Project labels and local path labels
-- Prompt optimization runs and savings stats
+- TokenGuard user email
+- Optimization prompt history and savings stats
 - User settings
+- Optional bridge device metadata
 
 TokenGuard does not store:
 
 - ChatGPT password
 - ChatGPT browser cookies
 - Codex auth tokens on the hosted server
-- Full Codex conversations by default
+- Full Codex conversations as a sync product
 
 ## Local Development
 
@@ -91,111 +76,21 @@ Open:
 http://localhost:3000
 ```
 
-## Bridge Setup For Users
+## Optional Bridge
+
+The bridge is optional. The main product works by optimizing and copying prompts.
+
+If direct local Codex sending is desired:
+
+```bash
+npx -y tokenguard-bridge@latest start
+```
 
 Requirements:
 
 - Node.js 20 or newer.
-- Chrome for the hosted TokenGuard website. Safari may block hosted websites from talking to a local bridge.
-- Mac: Codex desktop app installed in `/Applications/Codex.app`.
-- Windows: Codex CLI installed and available as `codex` in PowerShell.
-- User is signed in to Codex with their ChatGPT/Codex account.
-
-Primary no-cost setup:
-
-```bash
-npx -y tokenguard-bridge@latest start
-```
-
-Mac beginner version:
-
-1. Install the Codex desktop app.
-2. Install Node.js 20 or newer from `nodejs.org`.
-3. Open Terminal with Command + Space, type `Terminal`, then press Enter.
-4. Paste the command above.
-5. Press Enter.
-6. Keep that Terminal window open while using TokenGuard.
-7. Return to TokenGuard.
-8. Click `Check bridge`.
-9. Click `Connect Codex`.
-
-Windows beginner version:
-
-1. Install Node.js 20 or newer from `nodejs.org`.
-2. Install Codex CLI and confirm this works in PowerShell:
-
-```powershell
-codex --version
-```
-
-3. Open PowerShell.
-4. Paste the command above.
-5. Press Enter.
-6. Keep that PowerShell window open while using TokenGuard.
-7. Return to TokenGuard.
-8. Click `Check bridge`.
-9. Click `Connect Codex`.
-
-The website checks for the bridge automatically.
-
-## Bridge Development
-
-For developer testing:
-
-```bash
-npm run bridge
-```
-
-The bridge listens on:
-
-```text
-http://127.0.0.1:47321
-```
-
-Health check:
-
-```text
-http://127.0.0.1:47321/health
-```
-
-The public npm package source lives in:
-
-```text
-packages/tokenguard-bridge
-```
-
-Before publishing a new bridge version:
-
-```bash
-npm run bridge:package
-npm login
-npm run bridge:publish
-```
-
-After publishing, users can start the bridge with:
-
-```bash
-npx -y tokenguard-bridge@latest start
-```
-
-If users prefer a global install and their system allows it:
-
-```bash
-npm install -g tokenguard-bridge@latest
-tokenguard-bridge start
-```
-
-## macOS Bridge Fallback
-
-If NPM is not available, the no-cost unsigned macOS fallback package is available from:
-
-```text
-public/downloads/token-guard-bridge-macos.zip
-```
-
-Because the project is not using paid Apple signing/notarization, users may need to right-click `install.command` and choose `Open`. This is not the recommended primary path.
-
-The polished paid-production path would be a signed and notarized macOS app/pkg.
+- Chrome for hosted website to local bridge access.
+- Codex desktop app or Codex CLI installed locally.
 
 ## Database
 
@@ -212,6 +107,8 @@ Current metadata tables:
 - `mirrored_projects`
 - `pinned_threads`
 
+Some legacy tables remain from the earlier mirror prototype.
+
 ## Validation
 
 ```bash
@@ -221,7 +118,7 @@ npm run build
 
 ## Resume Bullets
 
-- Built a Codex-first token optimization workspace using Next.js, Vercel, Neon Postgres, and a local Node.js bridge.
-- Implemented a privacy-preserving architecture that mirrors Codex threads locally without storing full conversations on the hosted server.
-- Designed a backend-backed token savings dashboard with persisted optimization runs, pinned threads, projects, and bridge device status.
-- Integrated Codex app-server through a localhost bridge to support real account detection, thread listing, and optimized task execution.
+- Built a Codex context optimization app using Next.js, Vercel, Neon Postgres, and an optional local Node.js bridge.
+- Designed a prompt rewriting workflow that reduces repeated context by applying diff-aware instructions, focused acceptance criteria, and compact task packets.
+- Implemented a backend-backed token savings dashboard with persisted optimization runs and estimated avoided-token metrics.
+- Pivoted from a fragile chat-mirror design to a production-safe optimizer workflow after identifying platform sync limits.
