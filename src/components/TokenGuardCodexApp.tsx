@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment, @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/ban-ts-comment, @typescript-eslint/no-explicit-any, react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 // @ts-nocheck
 "use client";
 
@@ -99,9 +99,9 @@ function bridgeFetchOptions(options: RequestInit = {}) {
 }
 
 export default function TokenGuardCodexApp() {
-  const [email, setEmail] = useState(() => typeof window === "undefined" ? "" : window.localStorage.getItem("tokenguard_email") || "");
-  const [draftEmail, setDraftEmail] = useState(() => typeof window === "undefined" ? "" : window.localStorage.getItem("tokenguard_email") || "");
-  const [theme, setTheme] = useState(() => typeof window === "undefined" ? "light" : window.localStorage.getItem("tokenguard_theme") || "light");
+  const [email, setEmail] = useState("");
+  const [draftEmail, setDraftEmail] = useState("");
+  const [theme, setTheme] = useState("light");
   const [mode, setMode] = useState("balanced");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -122,6 +122,14 @@ export default function TokenGuardCodexApp() {
   const isAuthed = Boolean(email);
   const bridgeReady = bridge.status === "connected";
   const codexReady = Boolean(account?.account);
+
+  useEffect(() => {
+    const storedEmail = window.localStorage.getItem("tokenguard_email") || "";
+    const storedTheme = window.localStorage.getItem("tokenguard_theme") || "light";
+    setEmail(storedEmail);
+    setDraftEmail(storedEmail);
+    setTheme(storedTheme);
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
