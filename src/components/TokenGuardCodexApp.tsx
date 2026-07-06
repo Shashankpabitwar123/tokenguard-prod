@@ -81,58 +81,6 @@ Acceptance:
 - Run the smallest useful validation command.`;
 }
 
-function getThreadTitle(thread: any) {
-  const title = thread?.name || thread?.title || thread?.displayTitle || thread?.preview;
-  if (typeof title === "string" && title.trim()) {
-    return title.trim().split("\n")[0].slice(0, 80);
-  }
-  return "Untitled Codex thread";
-}
-
-function normalizeMessageRole(item: any) {
-  const role = item.role || item.type || item.kind || "codex";
-  if (role === "user" || role === "userMessage") return "user";
-  if (role === "assistant" || role === "agent" || role === "agentMessage" || role === "final_answer") return "codex";
-  if (role === "tokenguard") return "tokenguard";
-  return "codex";
-}
-
-function extractThreadMessages(threadPayload: any) {
-  const thread = threadPayload?.thread ?? threadPayload;
-  const turns = thread?.turns ?? [];
-  const messages: Array<{ role: string; text: string }> = [];
-
-  for (const turn of turns) {
-    const items = turn.items ?? turn.output ?? [];
-    for (const item of items) {
-      const role = normalizeMessageRole(item);
-      const contentText = Array.isArray(item.content)
-        ? item.content
-            .map((part: any) => part.text || part.content || "")
-            .filter(Boolean)
-            .join("\n")
-        : "";
-      const text =
-        item.text ||
-        item.content?.text ||
-        item.message?.content ||
-        item.output ||
-        item.summary ||
-        contentText ||
-        "";
-      if (typeof text === "string" && text.trim()) {
-        messages.push({ role, text });
-      }
-    }
-  }
-
-  if (messages.length === 0 && thread?.preview) {
-    messages.push({ role: "codex", text: thread.preview });
-  }
-
-  return messages;
-}
-
 async function jsonFetch(url: string, options?: RequestInit) {
   const response = await fetch(url, options);
   const payload = await response.json().catch(() => ({}));
@@ -160,8 +108,6 @@ export default function TokenGuardCodexApp() {
   const [bridge, setBridge] = useState({ status: "checking", detail: "Checking local bridge" });
   const [bridgeUrl, setBridgeUrl] = useState(BRIDGE_URL);
   const [account, setAccount] = useState<any>(null);
-  const [pins, setPins] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
   const [runs, setRuns] = useState<any[]>([]);
   const [lastRun, setLastRun] = useState<any>(null);
   const [selectedThread, setSelectedThread] = useState<any>(null);
@@ -217,12 +163,6 @@ export default function TokenGuardCodexApp() {
   }
 
   async function loadUserMetadata(userEmail = email) {
-    const [pinsPayload, projectsPayload] = await Promise.all([
-      jsonFetch(`/api/pins?email=${encodeURIComponent(userEmail)}`),
-      jsonFetch(`/api/projects?email=${encodeURIComponent(userEmail)}`),
-    ]);
-    setPins(pinsPayload.pins ?? []);
-    setProjects(projectsPayload.projects ?? []);
     await loadRuns(userEmail);
   }
 
@@ -294,60 +234,6 @@ export default function TokenGuardCodexApp() {
     } catch {
       setAccount(null);
     }
-  }
-
-  async function openThread(thread) {
-    setSelectedThread(thread);
-    setStatus("loading");
-    const payload = await jsonFetch(`${bridgeUrl}/threads/${encodeURIComponent(thread.id)}`, bridgeFetchOptions());
-    const payloadThread = payload?.thread ?? payload;
-    setSelectedThread({
-      ...thread,
-      id: payloadThread.id ?? payloadThread.sessionId ?? thread.id,
-      title: getThreadTitle(payloadThread),
-      cwd: payloadThread.cwd || thread.cwd || "",
-    });
-    const extracted = extractThreadMessages(payload);
-    setMessages(extracted.length ? extracted : [{ role: "codex", text: "Codex thread loaded." }]);
-    setStatus("idle");
-    setSidebarOpen(false);
-  }
-
-  async function pinThread(thread) {
-    if (!email || !thread?.id) return;
-    await jsonFetch("/api/pins", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        provider: "codex",
-        threadId: thread.id,
-        title: thread.title,
-        metadata: { cwd: thread.cwd },
-      }),
-    });
-    await loadUserMetadata();
-  }
-
-  async function unpinThread(threadId) {
-    await jsonFetch("/api/pins", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, provider: "codex", threadId }),
-    });
-    await loadUserMetadata();
-  }
-
-  async function createProject() {
-    const name = window.prompt("Project name");
-    if (!name?.trim()) return;
-    const cwd = window.prompt("Local project path for Codex bridge", "") || "";
-    await jsonFetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name: name.trim(), cwd }),
-    });
-    await loadUserMetadata();
   }
 
   function newChat() {
@@ -461,17 +347,10 @@ export default function TokenGuardCodexApp() {
         <Sidebar
           open={sidebarOpen}
           email={email}
-          threads={threads}
-          pins={pins}
-          projects={projects}
           bridge={bridge}
           runs={runs}
           onClose={() => setSidebarOpen(false)}
           onNewChat={newChat}
-          onOpenThread={openThread}
-          onPin={pinThread}
-          onUnpin={unpinThread}
-          onCreateProject={createProject}
           onSettings={() => setSettingsOpen(true)}
         />
 
